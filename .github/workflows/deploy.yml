@@ -1,0 +1,121 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  DOCKER_BUILDKIT: 1
+  COMPOSE_DOCKER_CLI_BUILD: 1
+
+jobs:
+  deploy:
+    name: Deploy to EC2
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.EC2_HOST }}
+          SSH_USER: ${{ secrets.EC2_USER }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H $SSH_HOST >> ~/.ssh/known_hosts
+      
+      - name: Deploy to EC2
+        env:
+          SSH_HOST: ${{ secrets.EC2_HOST }}
+          SSH_USER: ${{ secrets.EC2_USER }}
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          JWT_EXPIRATION: ${{ secrets.JWT_EXPIRATION }}
+        run: |
+          ssh -i ~/.ssh/deploy_key $SSH_USER@$SSH_HOST << 'ENDSSH'
+            set -e
+            
+            # Navigate to app directory
+            cd /home/$USER/promach-app || { echo "App directory not found"; exit 1; }
+            
+            # Pull latest changes
+            echo "📥 Pulling latest changes from GitHub..."
+            git pull origin main
+            
+            # Create/update .env file
+            echo "📝 Updating environment variables..."
+            cat > .env << EOF
+          MONGODB_URI=${{ secrets.MONGODB_URI }}
+          JWT_SECRET=${{ secrets.JWT_SECRET }}
+          JWT_EXPIRATION=${{ secrets.JWT_EXPIRATION }}
+          NODE_ENV=production
+          EOF
+            
+            # Stop existing containers
+            echo "🛑 Stopping existing containers..."
+            docker-compose down || true
+            
+            # Remove old images to save space
+            echo "🧹 Cleaning up old Docker images..."
+            docker system prune -af --filter "until=24h" || true
+            
+            # Build and start new containers
+            echo "🏗️  Building and starting containers..."
+            docker-compose up -d --build
+            
+            # Wait for services to be healthy
+            echo "⏳ Waiting for services to be healthy..."
+            sleep 10
+            
+            # Check backend health
+            echo "🔍 Checking backend health..."
+            docker-compose ps
+            
+            # Try to reach backend health endpoint
+            for i in {1..30}; do
+              if curl -f http://localhost:5000/health > /dev/null 2>&1; then
+                echo "✅ Backend is healthy!"
+                break
+              fi
+              echo "Waiting for backend... ($i/30)"
+              sleep 2
+            done
+            
+            # Check frontend
+            echo "🔍 Checking frontend..."
+            if curl -f http://localhost:80 > /dev/null 2>&1; then
+              echo "✅ Frontend is healthy!"
+            else
+              echo "⚠️  Frontend may not be ready yet, but deployment completed"
+            fi
+            
+            # Show container logs
+            echo "📋 Container status:"
+            docker-compose logs --tail=20
+            
+            echo "🎉 Deployment completed successfully!"
+          ENDSSH
+      
+      - name: Cleanup SSH
+        if: always()
+        run: |
+          rm -f ~/.ssh/deploy_key
+      
+      - name: Send deployment notification
+        if: success()
+        run: |
+          echo "✅ Deployment to EC2 completed successfully!"
+          echo "Backend: http://${{ secrets.EC2_HOST }}:5000"
+          echo "Frontend: http://${{ secrets.EC2_HOST }}"
+      
+      - name: Send failure notification
+        if: failure()
+        run: |
+          echo "❌ Deployment to EC2 failed!"
+          echo "Please check the logs above for details."

@@ -1,0 +1,267 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    /* Professional Dark Blue Palette - Classic & Corporate */
+    --background: 210 15% 94%; /* Subtle grey background: #eef1f4 */
+    --foreground: 203 41% 22%; /* Dark blue text: #213c4e */
+
+    --card: 210 12% 97%; /* Slightly off-white cards: #f5f7f9 */
+    --card-foreground: 203 41% 22%;
+
+    --popover: 210 12% 97%;
+    --popover-foreground: 203 41% 22%;
+
+    /* Primary: Professional Dark Blue #213c4e */
+    --primary: 203 41% 22%;
+    --primary-foreground: 210 15% 96%;
+
+    /* Secondary: Light slate grey backgrounds */
+    --secondary: 210 12% 88%; /* Darker secondary: #d9dee4 */
+    --secondary-foreground: 203 41% 22%;
+
+    /* Muted: Subtle grey backgrounds */
+    --muted: 210 12% 90%; /* #e2e6eb */
+    --muted-foreground: 207 15% 42%; /* #4a5a66 */
+
+    /* Accent: Slate Blue - Subtle highlights */
+    --accent: 203 30% 30%; /* Darker accent for visibility */
+    --accent-foreground: 0 0% 100%;
+
+    /* Destructive: Professional Red */
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 210 15% 78%; /* Darker borders: #bfc5cc */
+    --input: 210 12% 92%; /* Slightly darker input bg */
+    --ring: 203 41% 22%; /* Match Primary */
+
+    --radius: 0.5rem;
+
+    /* Sidebar - Professional Dark Blue */
+    --sidebar-background: 203 41% 12%; /* Even darker sidebar */
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-primary: 203 50% 35%; /* Lighter blue for hover */
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 203 35% 20%;
+    --sidebar-accent-foreground: 0 0% 95%;
+    --sidebar-border: 203 30% 18%;
+    --sidebar-ring: 203 41% 35%;
+  }
+
+
+}
+
+@layer utilities {
+  .glass {
+    @apply bg-white/80 backdrop-blur-sm border border-white/20 shadow-sm;
+  }
+  
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  /* Professional Logo-Inspired Styling - Subtle & Corporate */
+  .bg-brand-gradient {
+    @apply bg-primary; /* Solid professional teal */
+  }
+
+  .bg-brand-gradient-subtle {
+    @apply bg-gradient-to-br from-primary/10 to-primary/5; /* Very subtle gradient */
+  }
+
+  .text-brand-gradient {
+    @apply text-primary; /* Solid professional color */
+  }
+
+  .border-brand-gradient {
+    @apply border-primary/20;
+  }
+
+  /* Subtle professional accent */
+  .bg-accent-subtle {
+    @apply bg-gradient-to-r from-slate-50 to-slate-100;
+  }
+
+  /* Professional Animations */
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes fadeInDown {
+    from {
+      opacity: 0;
+      transform: translateY(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes slideInLeft {
+    from {
+      opacity: 0;
+      transform: translateX(-30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  @keyframes slideInRight {
+    from {
+      opacity: 0;
+      transform: translateX(30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  @keyframes scaleIn {
+    from {
+      opacity: 0;
+      transform: scale(0.9);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  @keyframes pulse {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.8;
+    }
+  }
+
+  @keyframes popIn {
+    0%, 100% {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+    10% {
+      opacity: 0;
+      transform: scale(0.5) translateY(10px);
+    }
+    20% {
+      transform: scale(1.1);
+      opacity: 1;
+    }
+    30%, 90% {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+
+  @keyframes pulseBounce {
+    0%, 100% {
+      transform: scale(1);
+      box-shadow: 0 0 0 0 rgba(33, 60, 78, 0.4);
+    }
+    50% {
+      transform: scale(1.05);
+      box-shadow: 0 0 0 8px rgba(33, 60, 78, 0);
+    }
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.6s ease-out;
+  }
+
+  .animate-fade-in-up {
+    animation: fadeInUp 0.6s ease-out;
+  }
+
+  .animate-fade-in-down {
+    animation: fadeInDown 0.6s ease-out;
+  }
+
+  .animate-slide-in-left {
+    animation: slideInLeft 0.6s ease-out;
+  }
+
+  .animate-slide-in-right {
+    animation: slideInRight 0.6s ease-out;
+  }
+
+  .animate-scale-in {
+    animation: scaleIn 0.5s ease-out;
+  }
+
+  .animate-pulse-subtle {
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  /* Hover animations */
+  .hover-lift {
+    @apply transition-transform duration-300 ease-out hover:-translate-y-1;
+  }
+
+  .hover-scale {
+    @apply transition-transform duration-300 ease-out hover:scale-105;
+  }
+
+  .hover-glow {
+    @apply transition-shadow duration-300 ease-out hover:shadow-lg hover:shadow-primary/20;
+  }
+
+  /* Infinite scrolling marquee animation */
+  @keyframes scroll-left {
+    0% {
+      transform: translateX(0);
+    }
+    100% {
+      transform: translateX(-50%);
+    }
+  }
+
+  .animate-scroll-left {
+    animation: scroll-left 20s linear infinite;
+  }
+
+  .animate-scroll-left:hover,
+  .hover\:pause-animation:hover {
+    animation-play-state: paused;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans;
+  }
+}
+
+/* Font loaded in index.html for better performance */
