@@ -10,7 +10,7 @@ import { useCMS } from '@/hooks/useCMS';
 import { cmsAPI, certificatesAPI } from '@/services/api';
 import { useToast } from '@/hooks/use-toast';
 
-const API_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:6001';
+const API_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || '';
 
 interface Certificate {
     _id: string;

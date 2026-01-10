@@ -81,7 +81,7 @@ interface CMSData {
     };
 }
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:6001/api';
+const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 export function useCMS() {
     const [data, setData] = useState<CMSData | null>(null);

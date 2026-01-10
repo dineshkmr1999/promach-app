@@ -18,7 +18,7 @@ import uafIso from "@/assets/UAF-ISO.png";
 import dunsNumber from "@/assets/duns-number.png";
 import { CERTIFICATES, openCertificate, PAGE_SEO } from "@/constants";
 
-const API_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:6001';
+const API_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || '';
 
 const Index = () => {
   const { data: cmsData } = useCMS();

@@ -7,7 +7,7 @@ import { useState, useEffect } from "react";
 import { Loader2, ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const API_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:6001';
+const API_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || '';
 
 interface PricingTableData {
   title: string;

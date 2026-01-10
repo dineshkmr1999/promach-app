@@ -21,7 +21,7 @@ import {
 import { Plus, Pencil, Trash2, X, Upload, Image as ImageIcon, MapPin, Calendar, Star, RefreshCw } from 'lucide-react';
 import { portfolioAPI } from '@/services/api';
 
-const API_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:6001';
+const API_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || '';
 
 interface PortfolioImage {
     url: string;

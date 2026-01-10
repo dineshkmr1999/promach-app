@@ -293,7 +293,7 @@ sudo nano /etc/nginx/sites-available/promach
 sudo apt install certbot python3-certbot-nginx -y
 
 # Get SSL certificate (BEFORE enabling the nginx config)
-sudo certbot certonly --nginx -d your-domain.com -d www.your-domain.com
+sudo certbot certonly --nginx -d promachpl.com -d www.promachpl.com
 
 # Follow the prompts:
 # - Enter your email

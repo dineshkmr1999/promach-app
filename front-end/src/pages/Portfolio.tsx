@@ -5,7 +5,7 @@ import { X, ChevronLeft, ChevronRight, MapPin, Calendar, Tag, ZoomIn, ImageOff }
 import { portfolioAPI } from '@/services/api';
 
 // Backend URL for serving images
-const API_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:6001';
+const API_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || '';
 
 // Before/After Image component with proper loading and error states
 const BeforeAfterImage = ({
