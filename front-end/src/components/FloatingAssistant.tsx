@@ -75,15 +75,15 @@ const FloatingAssistant = () => {
             <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 flex flex-col items-end gap-3 animate-fade-in">
                 {/* Welcome Message Bubble */}
                 {showWelcome && !isOpen && (
-                    <div className="animate-slide-in-right bg-white shadow-2xl rounded-2xl p-4 max-w-[280px] border border-primary/10 mb-2">
+                    <div className="animate-slide-in-right bg-white shadow-2xl rounded-2xl p-4 max-w-[260px] sm:max-w-[280px] border border-primary/10 mb-2">
                         <div className="flex items-start gap-3">
-                            <div className="w-10 h-10 bg-gradient-to-br from-primary to-primary/80 rounded-full flex items-center justify-center flex-shrink-0">
-                                <Wind size={20} className="text-white" />
+                            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-primary to-primary/80 rounded-full flex items-center justify-center flex-shrink-0">
+                                <Wind size={18} className="text-white sm:w-5 sm:h-5" />
                             </div>
                             <div className="flex-1">
                                 <p className="text-sm font-semibold text-slate-900 mb-1">Hi! I'm your AC Assistant 👋</p>
                                 <p className="text-xs text-slate-600 leading-relaxed">
-                                    Need help with cooling solutions? Click me for quick access to quotes, pricing & more!
+                                    Need help? Click for quick quotes & pricing!
                                 </p>
                             </div>
                             <button
@@ -108,23 +108,23 @@ const FloatingAssistant = () => {
                                 {option.external ? (
                                     <a
                                         href={option.link}
-                                        className={`flex items-center gap-3 bg-gradient-to-r ${option.color} ${option.hoverColor} backdrop-blur-sm border border-white/20 rounded-full px-4 py-3 shadow-lg hover:shadow-xl transition-all duration-300 hover-lift group min-w-[200px]`}
+                                        className={`flex items-center gap-3 bg-gradient-to-r ${option.color} ${option.hoverColor} backdrop-blur-sm border border-white/20 rounded-full px-4 py-3 shadow-lg hover:shadow-xl transition-all duration-300 hover-lift group min-w-[180px] sm:min-w-[200px]`}
                                     >
-                                        <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
-                                            <option.icon size={20} className="text-primary" />
+                                        <div className="w-8 h-8 sm:w-10 sm:h-10 bg-white rounded-full flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
+                                            <option.icon size={18} className="text-primary sm:w-5 sm:h-5" />
                                         </div>
-                                        <span className="font-medium text-sm text-slate-700 pr-2">{option.label}</span>
+                                        <span className="font-medium text-xs sm:text-sm text-slate-700 pr-2">{option.label}</span>
                                     </a>
                                 ) : (
                                     <Link
                                         to={option.link}
                                         onClick={() => setIsOpen(false)}
-                                        className={`flex items-center gap-3 bg-gradient-to-r ${option.color} ${option.hoverColor} backdrop-blur-sm border border-white/20 rounded-full px-4 py-3 shadow-lg hover:shadow-xl transition-all duration-300 hover-lift group min-w-[200px]`}
+                                        className={`flex items-center gap-3 bg-gradient-to-r ${option.color} ${option.hoverColor} backdrop-blur-sm border border-white/20 rounded-full px-4 py-3 shadow-lg hover:shadow-xl transition-all duration-300 hover-lift group min-w-[180px] sm:min-w-[200px]`}
                                     >
-                                        <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
-                                            <option.icon size={20} className="text-primary" />
+                                        <div className="w-8 h-8 sm:w-10 sm:h-10 bg-white rounded-full flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
+                                            <option.icon size={18} className="text-primary sm:w-5 sm:h-5" />
                                         </div>
-                                        <span className="font-medium text-sm text-slate-700 pr-2">{option.label}</span>
+                                        <span className="font-medium text-xs sm:text-sm text-slate-700 pr-2">{option.label}</span>
                                     </Link>
                                 )}
                             </div>
@@ -135,22 +135,22 @@ const FloatingAssistant = () => {
                 {/* Main Assistant Button with AC Character */}
                 <button
                     onClick={handleToggle}
-                    className={`relative w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-primary via-primary to-primary/80 shadow-2xl hover:shadow-primary/50 transition-all duration-300 hover:scale-110 group ${isOpen ? 'rotate-0' : 'hover:rotate-12'} overflow-hidden`}
+                    className={`relative w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-primary via-primary to-primary/80 shadow-2xl hover:shadow-primary/50 transition-all duration-300 hover:scale-110 group ${isOpen ? 'rotate-0' : 'hover:rotate-12'} overflow-hidden`}
                     aria-label="Virtual Assistant"
                 >
                     {isOpen ? (
-                        <X className="absolute inset-0 m-auto text-white z-10" size={28} />
+                        <X className="absolute inset-0 m-auto text-white z-10" size={24} />
                     ) : (
                         <>
                             {/* AC Character - Simple Wind Icon with Animation */}
                             <div className="absolute inset-0 flex items-center justify-center z-10">
                                 <div className="relative">
-                                    <Wind className="text-white animate-pulse-subtle" size={36} />
+                                    <Wind className="text-white animate-pulse-subtle w-7 h-7 sm:w-9 sm:h-9" />
                                     {/* Cooling effect lines */}
                                     <div className="absolute -right-1 top-1/2 -translate-y-1/2 flex flex-col gap-1">
-                                        <div className="w-2 h-0.5 bg-white/60 rounded animate-pulse" style={{ animationDelay: '0s' }} />
-                                        <div className="w-3 h-0.5 bg-white/60 rounded animate-pulse" style={{ animationDelay: '0.2s' }} />
-                                        <div className="w-2 h-0.5 bg-white/60 rounded animate-pulse" style={{ animationDelay: '0.4s' }} />
+                                        <div className="w-1.5 sm:w-2 h-0.5 bg-white/60 rounded animate-pulse" style={{ animationDelay: '0s' }} />
+                                        <div className="w-2.5 sm:w-3 h-0.5 bg-white/60 rounded animate-pulse" style={{ animationDelay: '0.2s' }} />
+                                        <div className="w-1.5 sm:w-2 h-0.5 bg-white/60 rounded animate-pulse" style={{ animationDelay: '0.4s' }} />
                                     </div>
                                 </div>
                             </div>

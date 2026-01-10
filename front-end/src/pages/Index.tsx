@@ -195,7 +195,7 @@ const Index = () => {
           </div>
 
           {/* CMS Certificates + Static Certificates */}
-          <div className="flex flex-wrap justify-center items-center gap-8 md:gap-12 lg:gap-16 max-w-6xl mx-auto">
+          <div className="flex flex-wrap justify-center items-center gap-6 md:gap-12 lg:gap-16 max-w-6xl mx-auto">
             {/* CMS Uploaded Certificates */}
             {cmsCertificates.length > 0 && cmsCertificates.map((cert) => (
               <button
@@ -209,11 +209,11 @@ const Index = () => {
                   <img
                     src={`${API_URL}${cert.icon}`}
                     alt={cert.name}
-                    className="relative h-20 md:h-24 w-auto object-contain grayscale group-hover:grayscale-0 transition-all duration-500"
+                    className="relative h-16 md:h-24 w-auto object-contain grayscale group-hover:grayscale-0 transition-all duration-500"
                   />
                 ) : (
-                  <div className="relative h-20 md:h-24 w-20 md:w-24 bg-slate-100 rounded-xl flex items-center justify-center group-hover:bg-primary/10 transition-colors">
-                    <Award className="w-10 h-10 text-slate-400 group-hover:text-primary transition-colors" />
+                  <div className="relative h-16 md:h-24 w-16 md:w-24 bg-slate-100 rounded-xl flex items-center justify-center group-hover:bg-primary/10 transition-colors">
+                    <Award className="w-8 h-8 md:w-10 md:h-10 text-slate-400 group-hover:text-primary transition-colors" />
                     <span className="absolute -bottom-6 text-xs font-medium text-slate-600 whitespace-nowrap">{cert.name}</span>
                   </div>
                 )}
@@ -234,21 +234,21 @@ const Index = () => {
                     <img
                       src={[iso9001, iso14001, iso45001, iso37001][idx]}
                       alt={cert.name}
-                      className="relative h-20 md:h-24 w-auto object-contain grayscale group-hover:grayscale-0 transition-all duration-500"
+                      className="relative h-16 md:h-24 w-auto object-contain grayscale group-hover:grayscale-0 transition-all duration-500"
                     />
                   </button>
                 ))}
               </>
             )}
 
-            {/* Separator */}
+            {/* Separator - Hidden on mobile */}
             <div className="h-16 w-px bg-gradient-to-b from-transparent via-slate-300 to-transparent hidden md:block" />
 
             {/* Static Accreditation Logos */}
-            <div className="flex items-center gap-8 md:gap-12">
-              <img src={sccIso} alt="SCC Accredited" className="h-16 md:h-20 w-auto object-contain grayscale hover:grayscale-0 transition-all duration-500 hover:scale-110" />
-              <img src={uafIso} alt="UAF Accredited" className="h-16 md:h-20 w-auto object-contain grayscale hover:grayscale-0 transition-all duration-500 hover:scale-110" />
-              <img src={dunsNumber} alt="DUNS Registered" className="h-16 md:h-20 w-auto object-contain grayscale hover:grayscale-0 transition-all duration-500 hover:scale-110" />
+            <div className="flex flex-wrap justify-center items-center gap-6 md:gap-12 w-full md:w-auto mt-4 md:mt-0">
+              <img src={sccIso} alt="SCC Accredited" className="h-12 md:h-20 w-auto object-contain grayscale hover:grayscale-0 transition-all duration-500 hover:scale-110" />
+              <img src={uafIso} alt="UAF Accredited" className="h-12 md:h-20 w-auto object-contain grayscale hover:grayscale-0 transition-all duration-500 hover:scale-110" />
+              <img src={dunsNumber} alt="DUNS Registered" className="h-12 md:h-20 w-auto object-contain grayscale hover:grayscale-0 transition-all duration-500 hover:scale-110" />
             </div>
           </div>
         </div>

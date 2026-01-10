@@ -19,7 +19,14 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Serve uploaded files
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+// Serve uploaded files
+const uploadsPath = path.join(__dirname, '../uploads');
+console.log('📂 Serving uploads from:', uploadsPath);
+
+app.use('/uploads', (req, res, next) => {
+    console.log(`📂 Request for upload: ${req.path}`);
+    next();
+}, express.static(uploadsPath));
 
 // MongoDB Connection
 mongoose.connect(process.env.MONGODB_URI)

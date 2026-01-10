@@ -15,7 +15,7 @@ interface LayoutProps {
  */
 const Layout = ({ children, seo, className = "" }: LayoutProps) => {
   return (
-    <div className={`min-h-screen flex flex-col bg-background font-sans selection:bg-primary/20 selection:text-primary ${className}`}>
+    <div className={`min-h-screen flex flex-col bg-background font-sans selection:bg-primary/20 selection:text-primary overflow-x-hidden overflow-y-auto ${className}`}>
       {seo && <SEO {...seo} />}
       <Navigation />
       <main className="flex-1">

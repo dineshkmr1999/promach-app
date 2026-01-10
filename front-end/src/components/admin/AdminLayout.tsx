@@ -151,10 +151,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                     className={`
                         ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
                         lg:translate-x-0 
-                        fixed lg:static inset-y-0 left-0 z-40
+                        fixed lg:sticky top-16 left-0 z-40
                         w-64 bg-card border-r border-slate-200
                         transition-transform duration-300 ease-in-out
-                        mt-16 lg:mt-0 lg:min-h-[calc(100vh-4rem)]
+                        mt-16 lg:mt-0 h-[calc(100vh-4rem)]
                         overflow-y-auto
                     `}
                 >

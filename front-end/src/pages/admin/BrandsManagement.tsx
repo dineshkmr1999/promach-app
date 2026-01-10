@@ -3,8 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus, Trash2, Image, Loader2, X, Upload, Eye, EyeOff, Pencil, Save } from 'lucide-react';
+import { Plus, Trash2, Image, Loader2, X, Upload, Eye, EyeOff, Pencil, Save, ArrowLeft } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useCMS } from '@/hooks/useCMS';
 import { brandsAPI } from '@/services/api';
 import { useToast } from '@/hooks/use-toast';
@@ -14,14 +15,15 @@ const API_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || '';
 interface Brand {
     _id: string;
     name: string;
-    logo: string;
-    isActive: boolean;
-    order: number;
+    logo?: string;
+    isActive?: boolean;
+    order?: number;
 }
 
 export default function BrandsManagement() {
     const { data: cmsData, isLoading, refetch } = useCMS();
     const { toast } = useToast();
+    const navigate = useNavigate();
 
     const [brands, setBrands] = useState<Brand[]>([]);
     const [showAddForm, setShowAddForm] = useState(false);
@@ -157,6 +159,15 @@ export default function BrandsManagement() {
         <AdminLayout>
             <div className="space-y-8">
                 <div>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className="mb-4 text-gray-500 hover:text-gray-900 -ml-2"
+                        onClick={() => navigate(-1)}
+                    >
+                        <ArrowLeft className="w-4 h-4 mr-2" />
+                        Back
+                    </Button>
                     <h1 className="text-3xl font-bold mb-2">Brand Logos</h1>
                     <p className="text-gray-600">Manage brand logos displayed on the landing page with scrolling effect</p>
                 </div>
