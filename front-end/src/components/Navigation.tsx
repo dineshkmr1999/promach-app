@@ -42,7 +42,7 @@ const Navigation = () => {
               <div className="absolute -inset-1 bg-primary/20 rounded-full blur opacity-0 group-hover:opacity-100 transition duration-500"></div>
               <img src={logo} alt="Promach Logo" className="relative h-14 w-auto object-contain transition-transform duration-300 group-hover:scale-105" />
             </div>
-            <span className="text-lg font-bold tracking-tight text-foreground hidden sm:inline group-hover:text-primary transition-colors duration-300">PROMACH</span>
+            <span className="text-lg font-bold tracking-tight text-foreground group-hover:text-primary transition-colors duration-300">PROMACH</span>
           </Link>
 
           {/* Desktop Navigation */}
