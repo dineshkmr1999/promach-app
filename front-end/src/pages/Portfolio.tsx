@@ -254,12 +254,21 @@ const CATEGORIES = [
     { value: 'installation', label: 'Installation' },
 ];
 
+import { useSearchParams } from 'react-router-dom';
+
 export default function Portfolio() {
+    const [searchParams] = useSearchParams();
     const [allItems, setAllItems] = useState<PortfolioItem[]>([]);
     const [items, setItems] = useState<PortfolioItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [selectedCategory, setSelectedCategory] = useState('all');
+    // Initialize category from URL param or default to 'all'
+    const initialCategory = searchParams.get('category');
+    const [selectedCategory, setSelectedCategory] = useState(
+        initialCategory && CATEGORIES.some(c => c.value === initialCategory)
+            ? initialCategory
+            : 'all'
+    );
     const [selectedItem, setSelectedItem] = useState<PortfolioItem | null>(null);
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
     const [isImageLoaded, setIsImageLoaded] = useState(false);
@@ -296,6 +305,14 @@ export default function Portfolio() {
             setItems(allItems.filter(item => item.category === selectedCategory));
         }
     }, [selectedCategory, allItems]);
+
+    // Sync with URL params if they change
+    useEffect(() => {
+        const categoryParam = searchParams.get('category');
+        if (categoryParam && CATEGORIES.some(c => c.value === categoryParam)) {
+            setSelectedCategory(categoryParam);
+        }
+    }, [searchParams]);
 
     const openLightbox = (item: PortfolioItem) => {
         setSelectedItem(item);

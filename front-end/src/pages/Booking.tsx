@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
+import { useSearchParams } from "react-router-dom";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
@@ -29,7 +30,11 @@ import { submissionsAPI } from "@/services/api";
 
 const Booking = () => {
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
   const [isSubmitted, setIsSubmitted] = useState(false);
+
+  // Get service from URL param
+  const serviceParam = searchParams.get("service");
 
   const form = useForm<BookingFormData>({
     resolver: zodResolver(bookingFormSchema),
@@ -41,7 +46,7 @@ const Booking = () => {
       address: "",
       postalCode: "",
       propertyType: "",
-      serviceType: "",
+      serviceType: (serviceParam as any) || "",
       numberOfUnits: undefined,
       brand: "",
       preferredDate: undefined,
@@ -52,6 +57,7 @@ const Booking = () => {
   });
 
   const { isSubmitting } = form.formState;
+  const watchServiceType = form.watch("serviceType");
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -314,52 +320,56 @@ const Booking = () => {
                           )}
                         />
 
-                        <FormField
-                          control={form.control}
-                          name="numberOfUnits"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Number of Units</FormLabel>
-                              <FormControl>
-                                <Input
-                                  type="number"
-                                  min="1"
-                                  max="100"
-                                  placeholder="e.g., 3"
-                                  {...field}
-                                  onChange={(e) => field.onChange(e.target.valueAsNumber)}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-
-                        <FormField
-                          control={form.control}
-                          name="brand"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Aircon Brand</FormLabel>
-                              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        {watchServiceType !== "renovation" && (
+                          <FormField
+                            control={form.control}
+                            name="numberOfUnits"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Number of Units</FormLabel>
                                 <FormControl>
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Select brand" />
-                                  </SelectTrigger>
+                                  <Input
+                                    type="number"
+                                    min="1"
+                                    max="100"
+                                    placeholder="e.g., 3"
+                                    {...field}
+                                    onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                                  />
                                 </FormControl>
-                                <SelectContent>
-                                  {AIRCON_BRANDS.map((brand) => (
-                                    <SelectItem key={brand} value={brand.toLowerCase().replace(/\s+/g, "-")}>
-                                      {brand}
-                                    </SelectItem>
-                                  ))}
-                                  <SelectItem value="others">Others</SelectItem>
-                                </SelectContent>
-                              </Select>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        )}
+
+                        {watchServiceType !== "renovation" && (
+                          <FormField
+                            control={form.control}
+                            name="brand"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Aircon Brand</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Select brand" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    {AIRCON_BRANDS.map((brand) => (
+                                      <SelectItem key={brand} value={brand.toLowerCase().replace(/\s+/g, "-")}>
+                                        {brand}
+                                      </SelectItem>
+                                    ))}
+                                    <SelectItem value="others">Others</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        )}
                       </div>
                     </div>
 
@@ -372,7 +382,9 @@ const Booking = () => {
                           name="preferredDate"
                           render={({ field }) => (
                             <FormItem className="flex flex-col">
-                              <FormLabel>Preferred Date</FormLabel>
+                              <FormLabel>
+                                {watchServiceType === "renovation" ? "Preferred Site Survey Date *" : "Preferred Date *"}
+                              </FormLabel>
                               <Popover>
                                 <PopoverTrigger asChild>
                                   <FormControl>
@@ -409,30 +421,34 @@ const Booking = () => {
                           )}
                         />
 
-                        <FormField
-                          control={form.control}
-                          name="timeSlot"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Time Slot</FormLabel>
-                              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                <FormControl>
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Select time" />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
+                        {watchServiceType !== "renovation" && (
+                          <FormField
+                            control={form.control}
+                            name="timeSlot"
+                            render={({ field }) => (
+                              <FormItem className="md:col-span-2">
+                                <FormLabel>Time Slot *</FormLabel>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-2">
                                   {TIME_SLOTS.map((slot) => (
-                                    <SelectItem key={slot.value} value={slot.value}>
-                                      {slot.label}
-                                    </SelectItem>
+                                    <Button
+                                      key={slot.value}
+                                      type="button"
+                                      variant={field.value === slot.value ? "default" : "outline"}
+                                      className={cn(
+                                        "w-full",
+                                        field.value === slot.value ? "bg-primary text-white" : "hover:border-primary hover:text-primary"
+                                      )}
+                                      onClick={() => field.onChange(slot.value)}
+                                    >
+                                      {slot.label.split(' - ').join('\n')}
+                                    </Button>
                                   ))}
-                                </SelectContent>
-                              </Select>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
+                                </div>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        )}
                       </div>
                     </div>
 

@@ -65,15 +65,15 @@ const Index = () => {
               <div className="w-16 h-16 sm:w-20 sm:h-20 bg-primary/90 backdrop-blur-sm rounded-2xl flex items-center justify-center mb-4 sm:mb-6 mx-auto shadow-lg shadow-primary/20">
                 <Wind size={32} className="text-white sm:w-10 sm:h-10" />
               </div>
-              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-4 sm:mb-6 text-white tracking-tight leading-tight">
+              <h1 className="text-white mb-6 leading-tight">
                 ACMV Systems <br />& Services
               </h1>
-              <p className="text-base sm:text-lg md:text-xl text-slate-200 mb-6 sm:mb-8 max-w-md mx-auto font-light leading-relaxed px-4">
+              <p className="text-xl text-slate-200 mb-8 max-w-md mx-auto font-light leading-relaxed px-4">
                 Expert installation, servicing, and maintenance for commercial and industrial cooling systems.
               </p>
-              <Link to="/aircon-services">
-                <Button size="lg" className="rounded-full px-6 sm:px-8 py-5 sm:py-6 text-base sm:text-lg bg-white text-primary hover:bg-slate-100 hover:text-primary border-0 shadow-xl hover:shadow-2xl transition-all duration-300 hover-lift min-h-[44px]">
-                  View Services
+              <Link to="/portfolio?category=aircon">
+                <Button size="xl" variant="default" className="shadow-xl hover:shadow-2xl hover-lift border-white/20 bg-white text-primary hover:bg-white/90">
+                  View Our Projects
                 </Button>
               </Link>
             </div>
@@ -93,14 +93,14 @@ const Index = () => {
               <div className="w-16 h-16 sm:w-20 sm:h-20 bg-white/90 backdrop-blur-sm rounded-2xl flex items-center justify-center mb-4 sm:mb-6 mx-auto shadow-lg">
                 <Home size={32} className="text-slate-900 sm:w-10 sm:h-10" />
               </div>
-              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-4 sm:mb-6 text-white tracking-tight leading-tight">
+              <h1 className="text-white mb-6 leading-tight">
                 Builder & <br />Renovation
               </h1>
-              <p className="text-base sm:text-lg md:text-xl text-slate-200 mb-6 sm:mb-8 max-w-md mx-auto font-light leading-relaxed px-4">
+              <p className="text-xl text-slate-200 mb-8 max-w-md mx-auto font-light leading-relaxed px-4">
                 Premium interior design and renovation solutions for homes, offices, and commercial spaces.
               </p>
-              <Link to="/renovation">
-                <Button size="lg" className="rounded-full px-6 sm:px-8 py-5 sm:py-6 text-base sm:text-lg bg-slate-900 text-white hover:bg-black border-0 shadow-xl hover:shadow-2xl transition-all duration-300 hover-lift min-h-[44px]">
+              <Link to="/portfolio?category=renovation">
+                <Button size="xl" variant="secondary" className="shadow-xl hover:shadow-2xl hover-lift">
                   Explore Projects
                 </Button>
               </Link>
@@ -114,7 +114,7 @@ const Index = () => {
         <div className="container mx-auto px-4">
           <div className="text-center mb-16 max-w-3xl mx-auto animate-fade-in-up">
             <span className="text-primary font-bold tracking-wider uppercase text-sm mb-2 block">Why Choose Us</span>
-            <h2 className="text-4xl md:text-5xl font-bold mb-6 tracking-tight text-slate-900">Excellence in Every Detail</h2>
+            <h2 className="text-slate-900 mb-6">Excellence in Every Detail</h2>
             <p className="text-lg text-slate-600 leading-relaxed">
               Promach maintains Shopping Malls, Clubs, Data Centres, Hospitals, Clinics, Laboratories & Industrial Plants island-wide. Our certified technicians deliver premium service with transparent pricing.
             </p>
@@ -144,7 +144,8 @@ const Index = () => {
       <section className="py-24 bg-card">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16 animate-fade-in-up">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4 tracking-tight text-slate-900">Our Core Services</h2>
+            <span className="text-primary font-bold tracking-wider uppercase text-sm mb-2 block">Our Expertise</span>
+            <h2 className="text-slate-900 mb-6">What We Do</h2>
             <p className="text-slate-600 max-w-2xl mx-auto">Comprehensive solutions for your cooling and construction needs.</p>
           </div>
 
@@ -188,7 +189,7 @@ const Index = () => {
               <Award size={24} className="text-primary" />
               <span className="text-primary font-semibold uppercase tracking-wider text-sm">Certified Excellence</span>
             </div>
-            <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-slate-900 mb-4">Accreditations & Awards</h2>
+            <h2 className="text-slate-900 mb-4">Accreditations & Awards</h2>
             <p className="text-lg text-slate-600 max-w-2xl mx-auto">
               We are committed to the highest standards of quality, safety, and environmental management.
             </p>
@@ -317,12 +318,12 @@ const Index = () => {
           </p>
           <div className="flex flex-col sm:flex-row gap-6 justify-center">
             <Link to="/booking">
-              <Button size="lg" variant="secondary" className="rounded-full px-10 py-7 text-lg font-semibold shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300">
+              <Button size="xl" variant="secondary" className="shadow-xl hover:shadow-2xl hover-lift">
                 Book an Appointment
               </Button>
             </Link>
             <Link to="/contact">
-              <Button size="lg" variant="outline" className="rounded-full px-10 py-7 text-lg font-semibold bg-transparent text-white border-white hover:bg-white hover:text-primary shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300">
+              <Button size="xl" variant="outline" className="bg-transparent text-white border-white hover:bg-white hover:text-primary shadow-xl hover:shadow-2xl hover-lift">
                 Request a Quote
               </Button>
             </Link>

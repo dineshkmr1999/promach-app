@@ -42,7 +42,7 @@ const Navigation = () => {
               <div className="absolute -inset-1 bg-primary/20 rounded-full blur opacity-0 group-hover:opacity-100 transition duration-500"></div>
               <img src={logo} alt="Promach Logo" className="relative h-14 w-auto object-contain transition-transform duration-300 group-hover:scale-105" />
             </div>
-            <span className="text-lg font-bold tracking-tight text-foreground group-hover:text-primary transition-colors duration-300">PROMACH</span>
+            <span className="text-sm font-bold tracking-tight text-foreground group-hover:text-primary transition-colors duration-300 -ml-1">PROMACH</span>
           </Link>
 
           {/* Desktop Navigation */}
@@ -137,9 +137,6 @@ const Navigation = () => {
               <Button
                 size="lg"
                 className="rounded-full shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all duration-300 hover:-translate-y-0.5"
-                style={{
-                  animation: 'pulseBounce 2s ease-in-out infinite'
-                }}
               >
                 Book Appointment
               </Button>

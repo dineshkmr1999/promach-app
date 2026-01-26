@@ -217,6 +217,7 @@ export const SERVICE_TYPES = [
   { value: "overhaul", label: "Chemical Overhaul" },
   { value: "repair", label: "Repair Call" },
   { value: "installation", label: "Installation" },
+  { value: "renovation", label: "Renovation Enquiry" },
   { value: "contract", label: "Contract Sign-Up" },
 ] as const;
 

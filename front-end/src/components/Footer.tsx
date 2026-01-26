@@ -122,18 +122,18 @@ const Footer = () => {
             </h4>
             <ul className="space-y-3 text-sm">
               {[
-                "Aircon Installation",
-                "Chemical Overhaul",
-                "General Servicing",
-                "Gas Top Up",
-                "Repair & Troubleshooting",
-                "Renovation Works",
-                "Interior Design",
+                { name: "Aircon Installation", link: "/aircon-services#installation" },
+                { name: "Chemical Overhaul", link: "/aircon-services#overhaul" },
+                { name: "General Servicing", link: "/aircon-services#normal" },
+                { name: "Gas Top Up", link: "/aircon-services#gas" },
+                { name: "Repair & Troubleshooting", link: "/aircon-services#repair" },
+                { name: "Renovation Works", link: "/renovation" },
+                { name: "Interior Design", link: "/renovation" },
               ].map((service) => (
-                <li key={service}>
-                  <span className="text-slate-400 hover:text-primary transition-colors cursor-default">
-                    {service}
-                  </span>
+                <li key={service.name}>
+                  <Link to={service.link} className="text-slate-400 hover:text-primary transition-colors inline-block">
+                    {service.name}
+                  </Link>
                 </li>
               ))}
             </ul>

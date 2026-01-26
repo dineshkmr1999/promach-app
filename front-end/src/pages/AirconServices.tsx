@@ -1,6 +1,6 @@
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { useCMS } from "@/hooks/useCMS";
 import { useState, useEffect } from "react";
@@ -78,6 +78,65 @@ const AirconServices = () => {
   const [pricingTables, setPricingTables] = useState<PricingTableData[]>([]);
   const [additionalServices, setAdditionalServices] = useState<any>(null);
   const [expandedService, setExpandedService] = useState<string | null>(null);
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
+
+  // Check for hash in URL to expand specific service
+  const location = useLocation();
+
+  useEffect(() => {
+    // Only proceed if we have a hash
+    if (!location.hash) return;
+
+    const hash = location.hash.replace('#', '').toLowerCase();
+    let targetId: string | null = null;
+    let shouldExpand = false;
+
+    // 1. Check Pricing Tables (Accordion)
+    if (pricingTables.length > 0) {
+      const match = pricingTables.find((table, idx) => {
+        const id = table.tableId?.toLowerCase() || `table-${idx}`;
+        const title = table.title.toLowerCase();
+
+        // Exact ID match or Keyword match
+        if (id === hash) return true;
+        if (hash === 'chemical' && title.includes('chemical') && !title.includes('overhaul')) return true;
+        if (hash === 'overhaul' && title.includes('overhaul')) return true;
+        if (hash === 'steam' && title.includes('steam')) return true;
+        if (hash === 'normal' && (title.includes('normal') || title.includes('general'))) return true;
+        if (hash === 'installation' && title.includes('installation')) return true;
+
+        return false;
+      });
+
+      if (match) {
+        targetId = match.tableId || `table-${pricingTables.indexOf(match)}`;
+        shouldExpand = true;
+      }
+    }
+
+    // 2. Check Static Cards (if not found in pricing tables)
+    if (!targetId) {
+      if (['condenser', 'gas', 'repair'].includes(hash)) {
+        targetId = hash;
+      }
+    }
+
+    // Execute Scroll & Highlight
+    if (targetId) {
+      if (shouldExpand) {
+        setExpandedService(targetId);
+      }
+      setHighlightedId(targetId);
+
+      // Scroll after delay
+      setTimeout(() => {
+        const element = document.getElementById(targetId!);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 300);
+    }
+  }, [pricingTables, location.hash]);
 
   useEffect(() => {
     if (cmsData) {
@@ -129,7 +188,14 @@ const AirconServices = () => {
                 const isExpanded = expandedService === tableKey;
 
                 return (
-                  <Card key={tableKey} id={tableKey} className="overflow-hidden">
+                  <Card
+                    key={tableKey}
+                    id={tableKey}
+                    className={cn(
+                      "overflow-hidden transition-all duration-500",
+                      (isExpanded || highlightedId === tableKey) ? "ring-2 ring-primary shadow-lg scale-[1.01]" : ""
+                    )}
+                  >
                     {/* Accordion Header - Click to expand */}
                     <button
                       onClick={() => setExpandedService(isExpanded ? null : tableKey)}
@@ -198,7 +264,10 @@ const AirconServices = () => {
             {/* Additional Services */}
             {additionalServices && (
               <div className="grid md:grid-cols-3 gap-6 my-8">
-                <Card>
+                <Card
+                  id="condenser"
+                  className={highlightedId === 'condenser' ? "ring-2 ring-primary shadow-lg scale-[1.01] transition-all duration-500" : "transition-all duration-500"}
+                >
                   <CardContent className="pt-6">
                     <h3 className="font-semibold text-lg mb-3">Condenser Cleaning</h3>
                     <ul className="space-y-2 text-sm">
@@ -209,7 +278,10 @@ const AirconServices = () => {
                   </CardContent>
                 </Card>
 
-                <Card>
+                <Card
+                  id="gas"
+                  className={highlightedId === 'gas' ? "ring-2 ring-primary shadow-lg scale-[1.01] transition-all duration-500" : "transition-all duration-500"}
+                >
                   <CardContent className="pt-6">
                     <h3 className="font-semibold text-lg mb-3">Gas Top-Up</h3>
                     <p className="text-xs text-muted-foreground mb-2">(Inclusive of GST & Transport)</p>
@@ -221,7 +293,10 @@ const AirconServices = () => {
                   </CardContent>
                 </Card>
 
-                <Card>
+                <Card
+                  id="repair"
+                  className={highlightedId === 'repair' ? "ring-2 ring-primary shadow-lg scale-[1.01] transition-all duration-500" : "transition-all duration-500"}
+                >
                   <CardContent className="pt-6">
                     <h3 className="font-semibold text-lg mb-3">Repair / Troubleshooting</h3>
                     <p className="text-sm mb-2">

@@ -61,6 +61,7 @@ export const bookingFormSchema = z.object({
     "repair",
     "installation",
     "contract",
+    "renovation",
     "",
   ], {
     errorMap: () => ({ message: "Please select a service type" }),
@@ -90,13 +91,13 @@ export const bookingFormSchema = z.object({
   // Schedule
   preferredDate: z
     .date({
-      errorMap: () => ({ message: "Please select a preferred date" }),
+      required_error: "Please select a preferred date",
+      invalid_type_error: "That's not a date!",
     })
     .refine(
       (date) => date >= new Date(new Date().setHours(0, 0, 0, 0)),
       "Please select a date in the future"
-    )
-    .optional(),
+    ),
   
   timeSlot: z.enum([
     "9-10",
@@ -120,6 +121,15 @@ export const bookingFormSchema = z.object({
     .refine((val) => val === true, {
       message: "You must agree to be contacted by Promach to proceed",
     }),
+}).superRefine((data, ctx) => {
+  // Time slot is mandatory unless it's a renovation enquiry
+  if (data.serviceType !== "renovation" && !data.timeSlot) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Please select a time slot",
+      path: ["timeSlot"],
+    });
+  }
 });
 
 export type BookingFormData = z.infer<typeof bookingFormSchema>;
