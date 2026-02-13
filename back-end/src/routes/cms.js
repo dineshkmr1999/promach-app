@@ -708,5 +708,260 @@ router.delete('/bca-registrations/builders/:id', verifyToken, async (req, res) =
     }
 });
 
+// ===================
+// CRO SETTINGS ROUTES
+// ===================
+
+// GET - Get all CRO settings
+router.get('/cro-settings', async (req, res) => {
+    try {
+        let cms = await CMSData.findOne();
+
+        if (!cms) {
+            cms = new CMSData();
+            await cms.save();
+        }
+
+        // Default CRO settings with testimonials
+        const defaultCroSettings = {
+            discountOffer: {
+                isEnabled: true,
+                discountAmount: '$20',
+                discountText: '$20 OFF your first service!',
+                expiryHours: 24,
+                ctaText: 'Claim Now'
+            },
+            urgencyBanner: {
+                isEnabled: true,
+                message: 'Limited Time: $20 OFF your first service!',
+                ctaText: 'Claim Now →',
+                backgroundColor: 'primary'
+            },
+            exitIntentPopup: {
+                isEnabled: true,
+                title: "Wait! Don't Leave Yet",
+                subtitle: 'Get $20 OFF your first service when you book with us!',
+                discountAmount: '$20 OFF',
+                ctaText: 'Claim My $20 Discount',
+                dismissText: "No thanks, I don't want to save money"
+            },
+            trustBadges: {
+                yearsExperience: '13+',
+                happyCustomers: '5,000+',
+                certifications: '4x ISO',
+                guarantee: 'BCA Registered'
+            },
+            testimonials: [
+                {
+                    _id: new mongoose.Types.ObjectId(),
+                    name: 'Sarah Tan',
+                    location: 'Bishan, HDB',
+                    rating: 5,
+                    text: 'Excellent service! The technicians were punctual and professional. My aircon is now cooling like new after the chemical wash. Highly recommended!',
+                    serviceType: 'aircon',
+                    date: '2 weeks ago',
+                    isActive: true
+                },
+                {
+                    _id: new mongoose.Types.ObjectId(),
+                    name: 'David Lim',
+                    location: 'Tampines, Condo',
+                    rating: 5,
+                    text: 'Promach transformed our old condo into a modern home. The team was patient with our requests and delivered beyond expectations. Great quality!',
+                    serviceType: 'renovation',
+                    date: '1 month ago',
+                    isActive: true
+                },
+                {
+                    _id: new mongoose.Types.ObjectId(),
+                    name: 'Michelle Wong',
+                    location: 'Jurong, Office',
+                    rating: 5,
+                    text: "We've been using Promach for our office aircon maintenance for 3 years. Always reliable and responsive. Their contract pricing is very competitive.",
+                    serviceType: 'aircon',
+                    date: '3 weeks ago',
+                    isActive: true
+                },
+                {
+                    _id: new mongoose.Types.ObjectId(),
+                    name: 'Ahmad Rahman',
+                    location: 'Woodlands, HDB',
+                    rating: 5,
+                    text: 'Fast response and fair pricing. The technician explained everything clearly before starting work. Will definitely use them again.',
+                    serviceType: 'aircon',
+                    date: '1 week ago',
+                    isActive: true
+                },
+                {
+                    _id: new mongoose.Types.ObjectId(),
+                    name: 'Jennifer Lee',
+                    location: 'Bukit Timah, Landed',
+                    rating: 5,
+                    text: 'From design to completion, the Promach team was professional and delivered on time. Our kitchen renovation looks amazing!',
+                    serviceType: 'renovation',
+                    date: '2 months ago',
+                    isActive: true
+                }
+            ],
+            quickQuoteModal: {
+                isEnabled: true,
+                title: 'Get Your Free Quote',
+                subtitle: 'Takes less than 60 seconds'
+            },
+            mobileCTABar: {
+                isEnabled: true,
+                showCallButton: true,
+                showWhatsAppButton: true,
+                showQuoteButton: true
+            }
+        };
+
+        // If croSettings doesn't exist or testimonials are empty, seed defaults
+        if (!cms.croSettings || !cms.croSettings.testimonials || cms.croSettings.testimonials.length === 0) {
+            const existingSettings = cms.croSettings && typeof cms.croSettings.toObject === 'function'
+                ? cms.croSettings.toObject()
+                : (cms.croSettings || {});
+
+            // Remove _id from existing settings to avoid conflicts if present
+            delete existingSettings._id;
+
+            cms.croSettings = {
+                ...defaultCroSettings,
+                ...existingSettings,
+                testimonials: defaultCroSettings.testimonials
+            };
+            await cms.save();
+        }
+
+        res.json(cms.croSettings);
+    } catch (error) {
+        res.status(500).json({ message: 'Error fetching CRO settings', error: error.message });
+    }
+});
+
+// PUT - Update CRO settings (all sections)
+router.put('/cro-settings', verifyToken, async (req, res) => {
+    try {
+        const { discountOffer, urgencyBanner, exitIntentPopup, trustBadges, quickQuoteModal, mobileCTABar } = req.body;
+
+        let cms = await CMSData.findOne();
+        if (!cms) {
+            cms = new CMSData();
+        }
+
+        if (!cms.croSettings) {
+            cms.croSettings = {};
+        }
+
+        // Update each section if provided
+        if (discountOffer !== undefined) cms.croSettings.discountOffer = { ...cms.croSettings.discountOffer, ...discountOffer };
+        if (urgencyBanner !== undefined) cms.croSettings.urgencyBanner = { ...cms.croSettings.urgencyBanner, ...urgencyBanner };
+        if (exitIntentPopup !== undefined) cms.croSettings.exitIntentPopup = { ...cms.croSettings.exitIntentPopup, ...exitIntentPopup };
+        if (trustBadges !== undefined) cms.croSettings.trustBadges = { ...cms.croSettings.trustBadges, ...trustBadges };
+        if (quickQuoteModal !== undefined) cms.croSettings.quickQuoteModal = { ...cms.croSettings.quickQuoteModal, ...quickQuoteModal };
+        if (mobileCTABar !== undefined) cms.croSettings.mobileCTABar = { ...cms.croSettings.mobileCTABar, ...mobileCTABar };
+
+        await cms.save();
+        res.json({ message: 'CRO settings updated successfully', croSettings: cms.croSettings });
+    } catch (error) {
+        res.status(500).json({ message: 'Error updating CRO settings', error: error.message });
+    }
+});
+
+// =====================
+// TESTIMONIALS ROUTES
+// =====================
+
+// POST - Add testimonial
+router.post('/cro-settings/testimonials', verifyToken, async (req, res) => {
+    try {
+        const { name, location, rating, text, serviceType, date } = req.body;
+
+        if (!name || !text) {
+            return res.status(400).json({ message: 'Name and review text are required' });
+        }
+
+        const newTestimonial = {
+            _id: new mongoose.Types.ObjectId(),
+            name: name.trim(),
+            location: location || 'Singapore',
+            rating: rating || 5,
+            text: text.trim(),
+            serviceType: serviceType || 'aircon',
+            date: date || new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+            isActive: true
+        };
+
+        await CMSData.updateOne(
+            {},
+            { $push: { 'croSettings.testimonials': newTestimonial } },
+            { upsert: true, runValidators: false }
+        );
+
+        res.status(201).json({ message: 'Testimonial added successfully', testimonial: newTestimonial });
+    } catch (error) {
+        res.status(500).json({ message: 'Error adding testimonial', error: error.message });
+    }
+});
+
+// PUT - Update testimonial
+router.put('/cro-settings/testimonials/:id', verifyToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, location, rating, text, serviceType, date, isActive } = req.body;
+
+        const cmsDoc = await CMSData.findOne();
+        if (!cmsDoc || !cmsDoc.croSettings?.testimonials) {
+            return res.status(404).json({ message: 'Testimonials not found' });
+        }
+
+        const testimonialIndex = cmsDoc.croSettings.testimonials.findIndex(t => t._id.toString() === id);
+        if (testimonialIndex === -1) {
+            return res.status(404).json({ message: 'Testimonial not found' });
+        }
+
+        const testimonial = cmsDoc.croSettings.testimonials[testimonialIndex];
+        if (name !== undefined) testimonial.name = name;
+        if (location !== undefined) testimonial.location = location;
+        if (rating !== undefined) testimonial.rating = rating;
+        if (text !== undefined) testimonial.text = text;
+        if (serviceType !== undefined) testimonial.serviceType = serviceType;
+        if (date !== undefined) testimonial.date = date;
+        if (isActive !== undefined) testimonial.isActive = isActive;
+
+        await CMSData.updateOne(
+            { _id: cmsDoc._id },
+            { $set: { [`croSettings.testimonials.${testimonialIndex}`]: testimonial } },
+            { runValidators: false }
+        );
+
+        res.json({ message: 'Testimonial updated successfully', testimonial });
+    } catch (error) {
+        res.status(500).json({ message: 'Error updating testimonial', error: error.message });
+    }
+});
+
+// DELETE - Remove testimonial
+router.delete('/cro-settings/testimonials/:id', verifyToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const objectId = new mongoose.Types.ObjectId(id);
+
+        const result = await CMSData.updateOne(
+            {},
+            { $pull: { 'croSettings.testimonials': { _id: objectId } } },
+            { runValidators: false }
+        );
+
+        if (result.modifiedCount === 0) {
+            return res.status(404).json({ message: 'Testimonial not found' });
+        }
+
+        res.json({ message: 'Testimonial deleted successfully' });
+    } catch (error) {
+        res.status(500).json({ message: 'Error deleting testimonial', error: error.message });
+    }
+});
+
 module.exports = router;
 

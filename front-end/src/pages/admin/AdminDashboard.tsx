@@ -245,7 +245,7 @@ export default function AdminDashboard() {
                                                 {submission.name || submission.email || 'Anonymous'}
                                             </p>
                                             <p className="text-sm text-slate-500 truncate">
-                                                {submission.service || submission.type || 'General Inquiry'}
+                                                {submission.serviceType || submission.type || 'General Inquiry'}
                                             </p>
                                         </div>
                                         <div className="text-xs text-slate-400">

@@ -65,6 +65,9 @@ const Footer = () => {
             <p className="text-sm text-slate-400 leading-relaxed max-w-xs">
               Your trusted partner for ACMV services and renovation works in Singapore. Quality, reliability, and excellence in every project.
             </p>
+            <p className="text-xs text-slate-500 mt-1">
+              UEN: 202008249W
+            </p>
 
             {/* Social Media Icons */}
             {socialLinks.length > 0 && (
@@ -196,6 +199,7 @@ const Footer = () => {
             </p>
             <div className="flex gap-6">
               <Link to="#" className="hover:text-primary transition-colors">Privacy Policy</Link>
+              <Link to="#" className="hover:text-primary transition-colors">PDPA Notice</Link>
               <Link to="#" className="hover:text-primary transition-colors">Terms of Service</Link>
             </div>
           </div>

@@ -104,12 +104,17 @@ const Contact = () => {
       }}
     >
       {/* Header */}
-      <section className="bg-primary text-primary-foreground py-16">
-        <div className="container mx-auto px-4 text-center">
+      <section className="relative bg-gradient-to-br from-[hsl(203,41%,15%)] via-primary to-[hsl(203,35%,28%)] text-white py-20 md:py-24 overflow-hidden">
+        {/* Animated Background Orbs */}
+        <div className="absolute inset-0 opacity-15">
+          <div className="absolute top-0 left-1/4 w-80 h-80 bg-white/20 rounded-full blur-3xl animate-pulse" />
+          <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-white/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+        </div>
+        <div className="container mx-auto px-4 text-center relative z-10">
           <h1 className="text-4xl md:text-5xl font-bold mb-4">
             {contactPage.heroTitle || "Contact Us"}
           </h1>
-          <p className="text-xl max-w-3xl mx-auto">
+          <p className="text-lg md:text-xl text-white/80 max-w-3xl mx-auto">
             {contactPage.heroSubtitle || "Get in touch with our team for inquiries, quotes, or support"}
           </p>
         </div>

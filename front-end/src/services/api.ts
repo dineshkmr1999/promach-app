@@ -417,3 +417,70 @@ export const bcaRegistrationsAPI = {
   }
 };
 
+// CRO Settings API
+export const croSettingsAPI = {
+  getSettings: async () => {
+    const response = await fetch(`${API_URL}/cms/cro-settings`);
+    if (!response.ok) throw new Error('Failed to fetch CRO settings');
+    return response.json();
+  },
+  
+  updateSettings: async (data: any) => {
+    const token = localStorage.getItem('adminToken');
+    const response = await fetch(`${API_URL}/cms/cro-settings`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(data)
+    });
+    
+    if (!response.ok) throw new Error('Failed to update CRO settings');
+    return response.json();
+  },
+  
+  addTestimonial: async (data: any) => {
+    const token = localStorage.getItem('adminToken');
+    const response = await fetch(`${API_URL}/cms/cro-settings/testimonials`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(data)
+    });
+    
+    if (!response.ok) throw new Error('Failed to add testimonial');
+    return response.json();
+  },
+  
+  updateTestimonial: async (id: string, data: any) => {
+    const token = localStorage.getItem('adminToken');
+    const response = await fetch(`${API_URL}/cms/cro-settings/testimonials/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(data)
+    });
+    
+    if (!response.ok) throw new Error('Failed to update testimonial');
+    return response.json();
+  },
+  
+  deleteTestimonial: async (id: string) => {
+    const token = localStorage.getItem('adminToken');
+    const response = await fetch(`${API_URL}/cms/cro-settings/testimonials/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    
+    if (!response.ok) throw new Error('Failed to delete testimonial');
+    return response.json();
+  }
+};
+

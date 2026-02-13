@@ -32,6 +32,7 @@ const AboutUsManagement = lazy(() => import("./pages/admin/AboutUsManagement"));
 const ContactUsManagement = lazy(() => import("./pages/admin/ContactUsManagement"));
 const SEOManagement = lazy(() => import("./pages/admin/SEOManagement"));
 const BCARegistrationsManagement = lazy(() => import("./pages/admin/BCARegistrationsManagement"));
+const CROSettingsManagement = lazy(() => import("./pages/admin/CROSettingsManagement"));
 
 const queryClient = new QueryClient();
 
@@ -74,6 +75,7 @@ const App = () => (
                 <Route path="/admin/about-us" element={<AboutUsManagement />} />
                 <Route path="/admin/contact-us" element={<ContactUsManagement />} />
                 <Route path="/admin/seo" element={<SEOManagement />} />
+                <Route path="/admin/cro-settings" element={<CROSettingsManagement />} />
 
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />

@@ -132,6 +132,63 @@ const cmsSchema = new mongoose.Schema({
             expiryDate: String,
             isActive: { type: Boolean, default: true }
         }]
+    },
+    // CRO Settings - Conversion Rate Optimization
+    croSettings: {
+        // Discount Offer Settings
+        discountOffer: {
+            isEnabled: { type: Boolean, default: true },
+            discountAmount: { type: String, default: '$20' },
+            discountText: { type: String, default: '$20 OFF your first service!' },
+            expiryHours: { type: Number, default: 24 },
+            ctaText: { type: String, default: 'Claim Now' }
+        },
+        // Urgency Banner Settings
+        urgencyBanner: {
+            isEnabled: { type: Boolean, default: true },
+            message: { type: String, default: 'Limited Time: $20 OFF your first service!' },
+            ctaText: { type: String, default: 'Claim Now →' },
+            backgroundColor: { type: String, default: 'primary' }
+        },
+        // Exit Intent Popup Settings
+        exitIntentPopup: {
+            isEnabled: { type: Boolean, default: true },
+            title: { type: String, default: "Wait! Don't Leave Yet" },
+            subtitle: { type: String, default: 'Get $20 OFF your first service when you book with us!' },
+            discountAmount: { type: String, default: '$20 OFF' },
+            ctaText: { type: String, default: 'Claim My $20 Discount' },
+            dismissText: { type: String, default: "No thanks, I don't want to save money" }
+        },
+        // Trust Badges Settings
+        trustBadges: {
+            yearsExperience: { type: String, default: '13+' },
+            happyCustomers: { type: String, default: '5,000+' },
+            certifications: { type: String, default: '4x ISO' },
+            guarantee: { type: String, default: 'BCA Registered' }
+        },
+        // Testimonials
+        testimonials: [{
+            name: String,
+            location: String,
+            rating: { type: Number, default: 5 },
+            text: String,
+            serviceType: { type: String, enum: ['aircon', 'renovation'], default: 'aircon' },
+            date: String,
+            isActive: { type: Boolean, default: true }
+        }],
+        // Quick Quote Modal Settings
+        quickQuoteModal: {
+            isEnabled: { type: Boolean, default: true },
+            title: { type: String, default: 'Get Your Free Quote' },
+            subtitle: { type: String, default: 'Takes less than 60 seconds' }
+        },
+        // Mobile CTA Bar Settings
+        mobileCTABar: {
+            isEnabled: { type: Boolean, default: true },
+            showCallButton: { type: Boolean, default: true },
+            showWhatsAppButton: { type: Boolean, default: true },
+            showQuoteButton: { type: Boolean, default: true }
+        }
     }
 }, { timestamps: true });
 

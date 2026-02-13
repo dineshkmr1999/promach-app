@@ -8,6 +8,9 @@ dotenv.config();
 
 const app = express();
 
+// Trust proxy for IP extraction (needed for Nginx/Cloudflare)
+app.set('trust proxy', true);
+
 // Middleware
 app.use(cors({
     origin: ['http://localhost:9001', 'http://localhost:5173', 'http://localhost:3000'],

@@ -69,7 +69,7 @@ All colors MUST be HSL.
 
   /* Professional Logo-Inspired Styling - Subtle & Corporate */
   .bg-brand-gradient {
-    @apply bg-primary; /* Solid professional teal */
+    background: linear-gradient(135deg, hsl(203 41% 15%), hsl(203 41% 22%), hsl(203 35% 28%));
   }
 
   .bg-brand-gradient-subtle {
@@ -252,6 +252,27 @@ All colors MUST be HSL.
   .hover\:pause-animation:hover {
     animation-play-state: paused;
   }
+
+  /* Scale in animation for modals */
+  @keyframes scale-in {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  .animate-scale-in {
+    animation: scale-in 0.2s ease-out;
+  }
+
+  /* Safe area inset for notched devices */
+  .safe-area-inset-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
 }
 
 @layer base {
@@ -259,8 +280,25 @@ All colors MUST be HSL.
     @apply border-border;
   }
 
+  html {
+    scroll-behavior: smooth;
+  }
+
   body {
     @apply bg-background text-foreground font-sans antialiased;
+  }
+
+  /* Brand-colored text selection */
+  ::selection {
+    background-color: hsl(203 41% 22% / 0.15);
+    color: hsl(203 41% 22%);
+  }
+
+  /* WCAG 2.1 AA focus-visible outlines — Singapore accessibility standard */
+  :focus-visible {
+    outline: 2px solid hsl(203 41% 22%);
+    outline-offset: 2px;
+    border-radius: 4px;
   }
 
   h1 {

@@ -1,8 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import Layout from '@/components/Layout';
 import { Button } from '@/components/ui/button';
-import { X, ChevronLeft, ChevronRight, MapPin, Calendar, Tag, ZoomIn, ImageOff } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, MapPin, Calendar, Tag, ZoomIn, ImageOff, ArrowRight } from 'lucide-react';
 import { portfolioAPI } from '@/services/api';
+import { useInView } from '@/hooks/useInView';
+import { Link } from 'react-router-dom';
 
 // Backend URL for serving images
 const API_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || '';
@@ -397,18 +399,18 @@ export default function Portfolio() {
             }}
         >
             {/* Hero Section */}
-            <section className="relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white py-24 overflow-hidden">
-                {/* Animated Background */}
-                <div className="absolute inset-0 opacity-20">
-                    <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/30 rounded-full blur-3xl animate-pulse" />
-                    <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-500/30 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+            <section className="relative bg-gradient-to-br from-[hsl(203,41%,15%)] via-primary to-[hsl(203,35%,28%)] text-white py-20 md:py-24 overflow-hidden">
+                {/* Animated Background Orbs */}
+                <div className="absolute inset-0 opacity-15">
+                    <div className="absolute top-0 left-1/4 w-80 h-80 bg-white/20 rounded-full blur-3xl animate-pulse" />
+                    <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-white/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
                 </div>
 
                 <div className="container mx-auto px-4 text-center relative z-10">
-                    <h1 className="text-5xl md:text-6xl font-bold mb-6 animate-fade-in">
-                        Our <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-blue-400">Portfolio</span>
+                    <h1 className="text-5xl md:text-6xl font-bold mb-6">
+                        Our <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-white/90 to-white/70">Portfolio</span>
                     </h1>
-                    <p className="text-xl text-slate-300 max-w-2xl mx-auto animate-fade-in" style={{ animationDelay: '0.2s' }}>
+                    <p className="text-lg md:text-xl text-white/80 max-w-2xl mx-auto">
                         Explore our showcase of completed projects. Each one represents our commitment to excellence and customer satisfaction.
                     </p>
                 </div>
@@ -437,7 +439,7 @@ export default function Portfolio() {
             </section>
 
             {/* Portfolio Grid */}
-            <section className="py-16 bg-gradient-to-b from-secondary/50 to-background min-h-[60vh]">
+            <section className="py-16 bg-gradient-to-b from-slate-50 to-white min-h-[60vh]">
                 <div className="container mx-auto px-4">
                     {isLoading ? (
                         <div className="flex items-center justify-center h-64">
@@ -693,23 +695,24 @@ export default function Portfolio() {
             }
 
             {/* CTA Section */}
-            <section className="py-24 bg-gradient-to-br from-primary via-primary to-blue-600 text-white relative overflow-hidden">
+            {/* CTA Section */}
+            <section className="py-20 md:py-24 bg-gradient-to-br from-[hsl(203,41%,15%)] via-primary to-[hsl(203,35%,28%)] text-white relative overflow-hidden">
                 <div className="absolute inset-0 opacity-10">
-                    <div className="absolute top-0 right-0 w-96 h-96 bg-white rounded-full blur-3xl" />
-                    <div className="absolute bottom-0 left-0 w-96 h-96 bg-white rounded-full blur-3xl" />
+                    <div className="absolute top-0 right-0 w-80 h-80 bg-white rounded-full blur-3xl" />
+                    <div className="absolute bottom-0 left-0 w-80 h-80 bg-white rounded-full blur-3xl" />
                 </div>
 
                 <div className="container mx-auto px-4 text-center relative z-10">
-                    <h2 className="text-4xl md:text-5xl font-bold mb-6">Ready to Start Your Project?</h2>
-                    <p className="text-xl text-white/80 mb-10 max-w-2xl mx-auto">
+                    <h2 className="text-3xl md:text-5xl font-bold mb-6">Ready to Start Your Project?</h2>
+                    <p className="text-lg md:text-xl text-white/80 mb-10 max-w-2xl mx-auto">
                         Let us help bring your vision to life. Contact us today for a free consultation.
                     </p>
                     <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                        <Button size="lg" variant="secondary" className="rounded-full px-8 text-lg" asChild>
-                            <a href="/booking">Get a Free Quote</a>
+                        <Button size="lg" variant="secondary" className="rounded-full px-8 text-base md:text-lg min-h-[48px]" asChild>
+                            <Link to="/booking">Get a Free Quote <ArrowRight size={18} className="ml-2" /></Link>
                         </Button>
-                        <Button size="lg" className="rounded-full px-8 text-lg bg-white text-primary hover:bg-white/90 border-0" asChild>
-                            <a href="/contact">Contact Us</a>
+                        <Button size="lg" className="rounded-full px-8 text-base md:text-lg bg-white text-primary hover:bg-white/90 border-0 min-h-[48px]" asChild>
+                            <Link to="/contact">Contact Us</Link>
                         </Button>
                     </div>
                 </div>

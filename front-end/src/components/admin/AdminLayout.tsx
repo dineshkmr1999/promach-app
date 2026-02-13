@@ -17,7 +17,8 @@ import {
     FileText,
     Phone,
     Search,
-    Palette
+    Palette,
+    TrendingUp
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -39,6 +40,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         { path: '/admin/about-us', icon: FileText, label: 'About Us' },
         { path: '/admin/contact-us', icon: Phone, label: 'Contact Us' },
         { path: '/admin/seo', icon: Search, label: 'SEO Settings' },
+        { path: '/admin/cro-settings', icon: TrendingUp, label: 'CRO Settings' },
     ];
 
     // Check if current page is a CMS page
