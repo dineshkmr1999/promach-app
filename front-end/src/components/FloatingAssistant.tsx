@@ -72,7 +72,7 @@ const FloatingAssistant = () => {
     return (
         <>
             {/* Floating Assistant Button */}
-            <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 flex flex-col items-end gap-3 animate-fade-in">
+            <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 hidden sm:flex flex-col items-end gap-3 animate-fade-in">
                 {/* Welcome Message Bubble */}
                 {showWelcome && !isOpen && (
                     <div className="animate-slide-in-right bg-white shadow-2xl rounded-2xl p-4 max-w-[260px] sm:max-w-[280px] border border-primary/10 mb-2">
