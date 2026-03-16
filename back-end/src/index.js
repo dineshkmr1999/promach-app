@@ -99,6 +99,14 @@ app.use('/api/portfolio', require('./routes/portfolio'));
 app.use('/api/analytics', require('./routes/analytics'));
 app.use('/api/submissions', submissionLimiter, require('./routes/submissions'));
 
+// ERP Routes (JWT-protected via erpAuth middleware inside each router)
+app.use('/api/erp/auth', authLimiter, require('./routes/erpAuth'));
+app.use('/api/erp/items', require('./routes/items'));
+app.use('/api/erp/locations', require('./routes/locations'));
+app.use('/api/erp/inventory', require('./routes/inventory'));
+app.use('/api/erp/jobs', require('./routes/jobTickets'));
+app.use('/api/erp/assets', require('./routes/assets'));
+
 // Health check
 app.get('/health', (req, res) => {
     res.json({ status: 'OK', timestamp: new Date().toISOString() });
