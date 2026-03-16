@@ -5,6 +5,7 @@ import { X, ChevronLeft, ChevronRight, MapPin, Calendar, Tag, ZoomIn, ImageOff, 
 import { portfolioAPI } from '@/services/api';
 import { useInView } from '@/hooks/useInView';
 import { Link } from 'react-router-dom';
+import PromachLoader from '@/components/PromachLoader';
 
 // Backend URL for serving images
 const API_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || '';
@@ -442,11 +443,7 @@ export default function Portfolio() {
             <section className="py-16 bg-gradient-to-b from-slate-50 to-white min-h-[60vh]">
                 <div className="container mx-auto px-4">
                     {isLoading ? (
-                        <div className="flex items-center justify-center h-64">
-                            <div className="relative">
-                                <div className="w-16 h-16 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
-                            </div>
-                        </div>
+                        <PromachLoader variant="inline" />
                     ) : items.length === 0 ? (
                         <div className="text-center py-20">
                             <div className="w-24 h-24 mx-auto mb-6 bg-muted rounded-full flex items-center justify-center">

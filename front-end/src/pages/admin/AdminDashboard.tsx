@@ -36,12 +36,17 @@ export default function AdminDashboard() {
                 portfolioAPI.getAll().catch(() => ({ items: [] }))
             ]);
 
+            // Handle both array and paginated { submissions, total } response
+            const submissionsList = Array.isArray(submissionsData)
+                ? submissionsData
+                : (submissionsData?.submissions || []);
+
             setStats({
-                totalSubmissions: Array.isArray(submissionsData) ? submissionsData.length : 0,
+                totalSubmissions: Array.isArray(submissionsData) ? submissionsData.length : (submissionsData?.total || submissionsList.length),
                 portfolioItems: portfolioData?.items?.length || portfolioData?.length || 0,
                 pageViews: analyticsData?.totalViews || 0,
                 uniqueVisitors: analyticsData?.uniqueVisitors || 0,
-                recentSubmissions: Array.isArray(submissionsData) ? submissionsData.slice(0, 5) : []
+                recentSubmissions: submissionsList.slice(0, 5)
             });
         } catch (err) {
             setError('Failed to load dashboard data');

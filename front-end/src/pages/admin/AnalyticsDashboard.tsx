@@ -3,6 +3,7 @@ import AdminLayout from '@/components/admin/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { analyticsAPI } from '@/services/api';
 import { TrendingUp, Users, Eye, ExternalLink } from 'lucide-react';
+import PromachLoader from '@/components/PromachLoader';
 
 export default function AnalyticsDashboard() {
     const [analytics, setAnalytics] = useState<any>(null);
@@ -27,7 +28,7 @@ export default function AnalyticsDashboard() {
     if (isLoading) {
         return (
             <AdminLayout>
-                <div className="text-center py-12">Loading analytics...</div>
+                <PromachLoader variant="inline" />
             </AdminLayout>
         );
     }

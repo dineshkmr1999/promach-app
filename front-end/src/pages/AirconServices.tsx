@@ -6,6 +6,7 @@ import { useCMS } from "@/hooks/useCMS";
 import { useState, useEffect } from "react";
 import { Loader2, ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
+import PromachLoader from "@/components/PromachLoader";
 
 const API_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || '';
 
@@ -179,10 +180,7 @@ const AirconServices = () => {
 
       <div className="container mx-auto px-4 py-12">
         {isLoading ? (
-          <div className="text-center py-12">
-            <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" />
-            <p className="mt-2 text-muted-foreground">Loading pricing...</p>
-          </div>
+          <PromachLoader variant="inline" text="Loading pricing..." />
         ) : (
           <>
             {/* CMS Pricing Tables - Accordion Style */}

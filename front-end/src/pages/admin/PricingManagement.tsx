@@ -9,6 +9,7 @@ import { useCMS } from '@/hooks/useCMS';
 import { cmsAPI, pricingTablesAPI } from '@/services/api';
 import { Save, ChevronDown, ChevronUp, Loader2, Plus, Trash2, PlusCircle, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import PromachLoader from '@/components/PromachLoader';
 
 interface PricingTable {
     _id?: string;
@@ -171,10 +172,7 @@ export default function PricingManagement() {
     if (isLoading) {
         return (
             <AdminLayout>
-                <div className="text-center py-12">
-                    <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" />
-                    <p className="mt-2 text-gray-600">Loading pricing data...</p>
-                </div>
+                <PromachLoader variant="inline" />
             </AdminLayout>
         );
     }

@@ -8,6 +8,7 @@ import { Save, Upload, Trash2, FileText, Award, Plus, X, ExternalLink, Loader2, 
 import { useState, useEffect, useRef } from 'react';
 import { useCMS } from '@/hooks/useCMS';
 import { cmsAPI, certificatesAPI } from '@/services/api';
+import PromachLoader from '@/components/PromachLoader';
 import { useToast } from '@/hooks/use-toast';
 
 const API_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || '';
@@ -151,9 +152,7 @@ export default function CertificatesManagement() {
     if (isLoading) {
         return (
             <AdminLayout>
-                <div className="flex items-center justify-center h-64">
-                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                </div>
+                <PromachLoader variant="inline" />
             </AdminLayout>
         );
     }

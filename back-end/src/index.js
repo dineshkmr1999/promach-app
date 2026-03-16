@@ -62,12 +62,13 @@ const authLimiter = rateLimit({
     message: { message: 'Too many login attempts, please try again later.' }
 });
 
-// Stricter rate limiter for form submissions - 5 per 15 minutes
+// Stricter rate limiter for public form submissions only - 5 per 15 minutes
 const submissionLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 5,
     standardHeaders: true,
     legacyHeaders: false,
+    skip: (req) => req.method !== 'POST',
     message: { message: 'Too many submissions, please try again later.' }
 });
 

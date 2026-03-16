@@ -9,6 +9,7 @@ import { useCMS } from '@/hooks/useCMS';
 import { cmsAPI } from '@/services/api';
 import { Save, Phone, MapPin, Loader2, FileText, MessageSquare } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import PromachLoader from '@/components/PromachLoader';
 
 export default function ContactUsManagement() {
     const { data: cmsData, isLoading, refetch } = useCMS();
@@ -57,9 +58,7 @@ export default function ContactUsManagement() {
     if (isLoading) {
         return (
             <AdminLayout>
-                <div className="flex items-center justify-center min-h-[400px]">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                </div>
+                <PromachLoader variant="inline" />
             </AdminLayout>
         );
     }

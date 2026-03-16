@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { croSettingsAPI } from '@/services/api';
 import { useToast } from '@/hooks/use-toast';
+import PromachLoader from '@/components/PromachLoader';
 
 interface Testimonial {
     _id?: string;
@@ -211,7 +212,7 @@ export default function CROSettingsManagement() {
     if (loading) {
         return (
             <AdminLayout>
-                <div className="flex items-center justify-center h-64">Loading...</div>
+                <PromachLoader variant="inline" />
             </AdminLayout>
         );
     }

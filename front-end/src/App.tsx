@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { HelmetProvider } from "react-helmet-async";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import FloatingAssistant from "@/components/FloatingAssistant";
+import PromachLoader from "@/components/PromachLoader";
 import Index from "./pages/Index";
 import Renovation from "./pages/Renovation";
 import Booking from "./pages/Booking";
@@ -33,15 +34,9 @@ const ContactUsManagement = lazy(() => import("./pages/admin/ContactUsManagement
 const SEOManagement = lazy(() => import("./pages/admin/SEOManagement"));
 const BCARegistrationsManagement = lazy(() => import("./pages/admin/BCARegistrationsManagement"));
 const CROSettingsManagement = lazy(() => import("./pages/admin/CROSettingsManagement"));
+const InventoryManagement = lazy(() => import("./pages/admin/InventoryManagement"));
 
 const queryClient = new QueryClient();
-
-// Loading fallback
-const PageLoader = () => (
-  <div className="min-h-screen flex items-center justify-center bg-background">
-    <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
-  </div>
-);
 
 const App = () => (
   <HelmetProvider>
@@ -51,7 +46,7 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
-            <Suspense fallback={<PageLoader />}>
+            <Suspense fallback={<PromachLoader />}>
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/aircon-services" element={<AirconServices />} />
@@ -76,6 +71,7 @@ const App = () => (
                 <Route path="/admin/contact-us" element={<ContactUsManagement />} />
                 <Route path="/admin/seo" element={<SEOManagement />} />
                 <Route path="/admin/cro-settings" element={<CROSettingsManagement />} />
+                <Route path="/admin/inventory" element={<InventoryManagement />} />
 
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
