@@ -2,7 +2,8 @@ const jwt = require('jsonwebtoken');
 const ERPUser = require('../models/ERPUser');
 
 /**
- * Verify JWT token from ERP users.
+ * Verify JWT token from ERP users OR CMS admin users.
+ * ERP tokens carry an `erpUser` flag; CMS admin tokens carry a role of admin/superadmin.
  * Attaches decoded payload to req.erpUser = { id, email, role }
  */
 const verifyERPToken = (req, res, next) => {
@@ -15,11 +16,17 @@ const verifyERPToken = (req, res, next) => {
 
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        // ERP tokens carry an `erpUser` flag to distinguish from CMS admin tokens
-        if (!decoded.erpUser) {
-            return res.status(401).json({ message: 'Invalid ERP token' });
+
+        if (decoded.erpUser) {
+            // Native ERP token
+            req.erpUser = decoded;
+        } else if (decoded.role === 'admin' || decoded.role === 'superadmin') {
+            // CMS admin token — grant full ERP Admin access
+            req.erpUser = { id: decoded.id, email: decoded.email, role: 'Admin', erpUser: true, cmsAdmin: true };
+        } else {
+            return res.status(401).json({ message: 'Invalid token' });
         }
-        req.erpUser = decoded;
+
         next();
     } catch (error) {
         if (error.name === 'TokenExpiredError') {

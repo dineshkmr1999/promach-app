@@ -1,7 +1,7 @@
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 function erpHeaders(json = true) {
-  const token = localStorage.getItem('erpToken');
+  const token = localStorage.getItem('erpToken') || localStorage.getItem('adminToken');
   const h: Record<string, string> = {};
   if (json) h['Content-Type'] = 'application/json';
   if (token) h['Authorization'] = `Bearer ${token}`;

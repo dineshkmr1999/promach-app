@@ -19,7 +19,8 @@ import {
     Search,
     Palette,
     TrendingUp,
-    Package
+    Package,
+    Users
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -199,6 +200,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                         {/* Bottom nav items */}
                         <div className="pt-2 border-t border-slate-100 mt-2">
                             {renderNavItem({ path: '/admin/inventory', icon: Package, label: 'Inventory Management' }, false, true)}
+                            {renderNavItem({ path: '/admin/users', icon: Users, label: 'User Management' }, false, true)}
                             {bottomNavItems.map((item) => renderNavItem(item, false, true))}
                         </div>
                     </nav>
