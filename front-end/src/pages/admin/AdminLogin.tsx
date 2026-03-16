@@ -77,7 +77,7 @@ export default function AdminLogin() {
                 </form>
 
                 <p className="text-center text-sm text-gray-500 mt-6">
-                    Default: admin@promach.com / admin123
+                    Contact your administrator for access credentials.
                 </p>
             </div>
         </div>

@@ -2,16 +2,26 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
 const Portfolio = require('../models/Portfolio');
+const { verifyToken } = require('./auth');
+
+// Ensure upload directory exists
+const portfolioUploadDir = path.join(__dirname, '../../uploads/portfolio');
+if (!fs.existsSync(portfolioUploadDir)) {
+    fs.mkdirSync(portfolioUploadDir, { recursive: true });
+}
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        cb(null, 'uploads/portfolio/');
+        cb(null, portfolioUploadDir);
     },
     filename: function (req, file, cb) {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+        // Sanitize original filename extension
+        const ext = path.extname(file.originalname).toLowerCase();
+        cb(null, file.fieldname + '-' + uniqueSuffix + ext);
     }
 });
 
@@ -66,7 +76,7 @@ router.get('/', async (req, res) => {
         res.json(items);
     } catch (error) {
         console.error('Error fetching portfolio:', error);
-        res.status(500).json({ message: 'Error fetching portfolio items', error: error.message });
+        res.status(500).json({ message: 'Error fetching portfolio items' });
     }
 });
 
@@ -79,13 +89,13 @@ router.get('/:id', async (req, res) => {
         }
         res.json(item);
     } catch (error) {
-        console.error('Error fetching portfolio item:', error);
-        res.status(500).json({ message: 'Error fetching portfolio item', error: error.message });
+        console.error('Error fetching portfolio item:', error.message);
+        res.status(500).json({ message: 'Error fetching portfolio item' });
     }
 });
 
 // POST create new portfolio item (with multiple file types)
-router.post('/', upload.fields([
+router.post('/', verifyToken, upload.fields([
     { name: 'images', maxCount: 10 },
     { name: 'beforeImages', maxCount: 5 },
     { name: 'afterImages', maxCount: 5 }
@@ -115,13 +125,13 @@ router.post('/', upload.fields([
         await portfolioItem.save();
         res.status(201).json(portfolioItem);
     } catch (error) {
-        console.error('Error creating portfolio item:', error);
-        res.status(500).json({ message: 'Error creating portfolio item', error: error.message });
+        console.error('Error creating portfolio item:', error.message);
+        res.status(500).json({ message: 'Error creating portfolio item' });
     }
 });
 
 // PUT update portfolio item (with multiple file types)
-router.put('/:id', upload.fields([
+router.put('/:id', verifyToken, upload.fields([
     { name: 'images', maxCount: 10 },
     { name: 'beforeImages', maxCount: 5 },
     { name: 'afterImages', maxCount: 5 }
@@ -159,13 +169,13 @@ router.put('/:id', upload.fields([
         await item.save();
         res.json(item);
     } catch (error) {
-        console.error('Error updating portfolio item:', error);
-        res.status(500).json({ message: 'Error updating portfolio item', error: error.message });
+        console.error('Error updating portfolio item:', error.message);
+        res.status(500).json({ message: 'Error updating portfolio item' });
     }
 });
 
 // DELETE portfolio item (soft delete)
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', verifyToken, async (req, res) => {
     try {
         const item = await Portfolio.findById(req.params.id);
         if (!item) {
@@ -177,8 +187,8 @@ router.delete('/:id', async (req, res) => {
 
         res.json({ message: 'Portfolio item deleted successfully' });
     } catch (error) {
-        console.error('Error deleting portfolio item:', error);
-        res.status(500).json({ message: 'Error deleting portfolio item', error: error.message });
+        console.error('Error deleting portfolio item:', error.message);
+        res.status(500).json({ message: 'Error deleting portfolio item' });
     }
 });
 

@@ -9,7 +9,6 @@
  */
 
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
 const dotenv = require('dotenv');
 const path = require('path');
 
@@ -45,20 +44,18 @@ const seedAdmin = async () => {
             return;
         }
 
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash('admin123', salt);
-
+        // Password will be hashed by the Admin model's pre-save hook
         const admin = new Admin({
             email: 'admin@promach.com',
-            password: hashedPassword,
+            password: process.env.ADMIN_DEFAULT_PASSWORD || 'ChangeMe!2024',
             name: 'Admin User',
-            role: 'super_admin'
+            role: 'superadmin'
         });
 
         await admin.save();
-        console.log('✅ Admin user created:');
+        console.log('✅ Admin user created');
         console.log('   Email: admin@promach.com');
-        console.log('   Password: admin123');
+        console.log('   IMPORTANT: Change the default password immediately after first login');
     } catch (error) {
         console.error('❌ Error seeding admin:', error.message);
     }

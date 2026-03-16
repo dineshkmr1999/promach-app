@@ -104,7 +104,8 @@ export default function SubmissionsManagement() {
             }
 
             const data = await submissionsAPI.getAll();
-            setSubmissions(Array.isArray(data) ? data : []);
+            const items = Array.isArray(data) ? data : (data.submissions || []);
+            setSubmissions(items);
         } catch (err: any) {
             console.error('Failed to fetch submissions:', err);
             if (err.message?.includes('401')) {

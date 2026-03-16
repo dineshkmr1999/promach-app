@@ -84,7 +84,7 @@ router.get('/', async (req, res) => {
 
         res.json(cms);
     } catch (error) {
-        res.status(500).json({ message: 'Error fetching CMS data', error: error.message });
+        res.status(500).json({ message: 'Error fetching CMS data' });
     }
 });
 
@@ -93,6 +93,17 @@ router.patch('/:section', verifyToken, async (req, res) => {
     try {
         const { section } = req.params;
         const updateData = req.body;
+
+        // Whitelist allowed sections to prevent arbitrary property injection
+        const allowedSections = [
+            'pricingTables', 'additionalServices', 'brands', 'brandsWithLogos',
+            'certificates', 'seo', 'companyInfo', 'socialMedia',
+            'aboutPage', 'contactPage', 'bcaRegistrations', 'croSettings'
+        ];
+
+        if (!allowedSections.includes(section)) {
+            return res.status(400).json({ message: 'Invalid section' });
+        }
 
         let cms = await CMSData.findOne();
 
@@ -106,7 +117,7 @@ router.patch('/:section', verifyToken, async (req, res) => {
 
         res.json(cms);
     } catch (error) {
-        res.status(500).json({ message: 'Error updating CMS data', error: error.message });
+        res.status(500).json({ message: 'Error updating CMS data' });
     }
 });
 
@@ -150,7 +161,7 @@ router.post('/pricing-tables', verifyToken, async (req, res) => {
 
         res.status(201).json({ message: 'Pricing table created successfully', pricingTable: newPricingTable });
     } catch (error) {
-        res.status(500).json({ message: 'Error creating pricing table', error: error.message });
+        res.status(500).json({ message: 'Error creating pricing table' });
     }
 });
 
@@ -190,7 +201,7 @@ router.put('/pricing-tables/:id', verifyToken, async (req, res) => {
 
         res.json({ message: 'Pricing table updated successfully', pricingTable: table });
     } catch (error) {
-        res.status(500).json({ message: 'Error updating pricing table', error: error.message });
+        res.status(500).json({ message: 'Error updating pricing table' });
     }
 });
 
@@ -212,7 +223,7 @@ router.delete('/pricing-tables/:id', verifyToken, async (req, res) => {
 
         res.json({ message: 'Pricing table deleted successfully' });
     } catch (error) {
-        res.status(500).json({ message: 'Error deleting pricing table', error: error.message });
+        res.status(500).json({ message: 'Error deleting pricing table' });
     }
 });
 
@@ -252,7 +263,7 @@ router.post('/certificates', verifyToken, certificateUpload.fields([
 
         res.status(201).json({ message: 'Certificate uploaded successfully', certificate: newCertificate });
     } catch (error) {
-        res.status(500).json({ message: 'Error uploading certificate', error: error.message });
+        res.status(500).json({ message: 'Error uploading certificate' });
     }
 });
 
@@ -319,7 +330,7 @@ router.put('/certificates/:id', verifyToken, certificateUpload.fields([
         const updatedCert = result.certificates.find(c => c._id.toString() === id);
         res.json({ message: 'Certificate updated successfully', certificate: updatedCert });
     } catch (error) {
-        res.status(500).json({ message: 'Error updating certificate', error: error.message });
+        res.status(500).json({ message: 'Error updating certificate' });
     }
 });
 
@@ -363,7 +374,7 @@ router.delete('/certificates/:id', verifyToken, async (req, res) => {
 
         res.json({ message: 'Certificate deleted successfully' });
     } catch (error) {
-        res.status(500).json({ message: 'Error deleting certificate', error: error.message });
+        res.status(500).json({ message: 'Error deleting certificate' });
     }
 });
 
@@ -401,7 +412,7 @@ router.post('/brands', verifyToken, brandUpload.single('logo'), async (req, res)
 
         res.status(201).json({ message: 'Brand added successfully', brand: newBrand });
     } catch (error) {
-        res.status(500).json({ message: 'Error adding brand', error: error.message });
+        res.status(500).json({ message: 'Error adding brand' });
     }
 });
 
@@ -439,7 +450,7 @@ router.delete('/brands/:id', verifyToken, async (req, res) => {
 
         res.json({ message: 'Brand deleted successfully' });
     } catch (error) {
-        res.status(500).json({ message: 'Error deleting brand', error: error.message });
+        res.status(500).json({ message: 'Error deleting brand' });
     }
 });
 
@@ -449,22 +460,17 @@ router.patch('/brands/:id', verifyToken, brandUpload.single('logo'), async (req,
         const { id } = req.params;
         const { isActive, order, name } = req.body;
 
-        console.log('PATCH /brands/:id - Received ID:', id);
-
         // First, try to find the CMS document and check if this brand exists
         const cmsDoc = await CMSData.findOne();
         if (!cmsDoc) {
             return res.status(404).json({ message: 'CMS data not found' });
         }
 
-        console.log('Brands in database:', cmsDoc.brandsWithLogos?.map(b => ({ id: b._id.toString(), name: b.name })));
-
         // Find the brand in the array
         const brandIndex = cmsDoc.brandsWithLogos?.findIndex(b => b._id.toString() === id);
-        console.log('Brand index found:', brandIndex);
 
         if (brandIndex === -1 || brandIndex === undefined) {
-            return res.status(404).json({ message: 'Brand not found', searchedId: id });
+            return res.status(404).json({ message: 'Brand not found' });
         }
 
         const brand = cmsDoc.brandsWithLogos[brandIndex];
@@ -496,7 +502,7 @@ router.patch('/brands/:id', verifyToken, brandUpload.single('logo'), async (req,
         res.json({ message: 'Brand updated successfully', brand });
     } catch (error) {
         console.error('Error updating brand:', error);
-        res.status(500).json({ message: 'Error updating brand', error: error.message });
+        res.status(500).json({ message: 'Error updating brand' });
     }
 });
 
@@ -526,7 +532,7 @@ router.put('/bca-registrations', verifyToken, async (req, res) => {
         await cms.save();
         res.json({ message: 'BCA registrations updated successfully', bcaRegistrations: cms.bcaRegistrations });
     } catch (error) {
-        res.status(500).json({ message: 'Error updating BCA registrations', error: error.message });
+        res.status(500).json({ message: 'Error updating BCA registrations' });
     }
 });
 
@@ -556,7 +562,7 @@ router.post('/bca-registrations/contractors', verifyToken, async (req, res) => {
 
         res.status(201).json({ message: 'Contractor added successfully', contractor: newContractor });
     } catch (error) {
-        res.status(500).json({ message: 'Error adding contractor', error: error.message });
+        res.status(500).json({ message: 'Error adding contractor' });
     }
 });
 
@@ -594,7 +600,7 @@ router.put('/bca-registrations/contractors/:id', verifyToken, async (req, res) =
 
         res.json({ message: 'Contractor updated successfully', contractor });
     } catch (error) {
-        res.status(500).json({ message: 'Error updating contractor', error: error.message });
+        res.status(500).json({ message: 'Error updating contractor' });
     }
 });
 
@@ -616,7 +622,7 @@ router.delete('/bca-registrations/contractors/:id', verifyToken, async (req, res
 
         res.json({ message: 'Contractor deleted successfully' });
     } catch (error) {
-        res.status(500).json({ message: 'Error deleting contractor', error: error.message });
+        res.status(500).json({ message: 'Error deleting contractor' });
     }
 });
 
@@ -645,7 +651,7 @@ router.post('/bca-registrations/builders', verifyToken, async (req, res) => {
 
         res.status(201).json({ message: 'Builder added successfully', builder: newBuilder });
     } catch (error) {
-        res.status(500).json({ message: 'Error adding builder', error: error.message });
+        res.status(500).json({ message: 'Error adding builder' });
     }
 });
 
@@ -682,7 +688,7 @@ router.put('/bca-registrations/builders/:id', verifyToken, async (req, res) => {
 
         res.json({ message: 'Builder updated successfully', builder });
     } catch (error) {
-        res.status(500).json({ message: 'Error updating builder', error: error.message });
+        res.status(500).json({ message: 'Error updating builder' });
     }
 });
 
@@ -704,7 +710,7 @@ router.delete('/bca-registrations/builders/:id', verifyToken, async (req, res) =
 
         res.json({ message: 'Builder deleted successfully' });
     } catch (error) {
-        res.status(500).json({ message: 'Error deleting builder', error: error.message });
+        res.status(500).json({ message: 'Error deleting builder' });
     }
 });
 
@@ -835,7 +841,7 @@ router.get('/cro-settings', async (req, res) => {
 
         res.json(cms.croSettings);
     } catch (error) {
-        res.status(500).json({ message: 'Error fetching CRO settings', error: error.message });
+        res.status(500).json({ message: 'Error fetching CRO settings' });
     }
 });
 
@@ -864,7 +870,7 @@ router.put('/cro-settings', verifyToken, async (req, res) => {
         await cms.save();
         res.json({ message: 'CRO settings updated successfully', croSettings: cms.croSettings });
     } catch (error) {
-        res.status(500).json({ message: 'Error updating CRO settings', error: error.message });
+        res.status(500).json({ message: 'Error updating CRO settings' });
     }
 });
 
@@ -900,7 +906,7 @@ router.post('/cro-settings/testimonials', verifyToken, async (req, res) => {
 
         res.status(201).json({ message: 'Testimonial added successfully', testimonial: newTestimonial });
     } catch (error) {
-        res.status(500).json({ message: 'Error adding testimonial', error: error.message });
+        res.status(500).json({ message: 'Error adding testimonial' });
     }
 });
 
@@ -937,7 +943,7 @@ router.put('/cro-settings/testimonials/:id', verifyToken, async (req, res) => {
 
         res.json({ message: 'Testimonial updated successfully', testimonial });
     } catch (error) {
-        res.status(500).json({ message: 'Error updating testimonial', error: error.message });
+        res.status(500).json({ message: 'Error updating testimonial' });
     }
 });
 
@@ -959,7 +965,7 @@ router.delete('/cro-settings/testimonials/:id', verifyToken, async (req, res) =>
 
         res.json({ message: 'Testimonial deleted successfully' });
     } catch (error) {
-        res.status(500).json({ message: 'Error deleting testimonial', error: error.message });
+        res.status(500).json({ message: 'Error deleting testimonial' });
     }
 });
 
