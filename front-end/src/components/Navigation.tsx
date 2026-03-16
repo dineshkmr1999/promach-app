@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Menu, X, Phone, Mail, Sparkles } from "lucide-react";
+import { Menu, X, Phone, Mail, Sparkles, HardHat } from "lucide-react";
 import {
   NavigationMenu,
   NavigationMenuContent,
@@ -62,6 +62,10 @@ const Navigation = () => {
                   <Mail size={14} className="text-primary" />
                   <span>enquiry@promachpl.com</span>
                 </a>
+                <Link to="/staff/login" className="flex items-center gap-1.5 hover:text-primary transition-colors duration-200">
+                  <HardHat size={14} className="text-primary" />
+                  <span>Staff Login</span>
+                </Link>
               </div>
             </div>
           </div>
@@ -233,6 +237,7 @@ const Navigation = () => {
               <Link to="/portfolio" className="block px-4 py-3 text-sm font-medium hover:bg-accent rounded-md transition-colors" onClick={() => setMobileMenuOpen(false)}>Portfolio</Link>
               <Link to="/about" className="block px-4 py-3 text-sm font-medium hover:bg-accent rounded-md transition-colors" onClick={() => setMobileMenuOpen(false)}>About Us</Link>
               <Link to="/contact" className="block px-4 py-3 text-sm font-medium hover:bg-accent rounded-md transition-colors" onClick={() => setMobileMenuOpen(false)}>Contact</Link>
+              <Link to="/staff/login" className="flex items-center gap-2 px-4 py-3 text-sm font-medium hover:bg-accent rounded-md transition-colors text-primary" onClick={() => setMobileMenuOpen(false)}><HardHat size={16} /> Staff Login</Link>
               <div className="px-4 pt-2">
                 <Link to="/booking" onClick={() => setMobileMenuOpen(false)} className="block">
                   <Button className="w-full rounded-full shadow-md">Book Appointment</Button>

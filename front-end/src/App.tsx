@@ -35,6 +35,7 @@ const SEOManagement = lazy(() => import("./pages/admin/SEOManagement"));
 const BCARegistrationsManagement = lazy(() => import("./pages/admin/BCARegistrationsManagement"));
 const CROSettingsManagement = lazy(() => import("./pages/admin/CROSettingsManagement"));
 const InventoryManagement = lazy(() => import("./pages/admin/InventoryManagement"));
+const StaffLogin = lazy(() => import("./pages/staff/StaffLogin"));
 
 const queryClient = new QueryClient();
 
@@ -55,6 +56,9 @@ const App = () => (
                 <Route path="/booking" element={<Booking />} />
                 <Route path="/about" element={<About />} />
                 <Route path="/contact" element={<Contact />} />
+
+                {/* Staff Portal */}
+                <Route path="/staff/login" element={<StaffLogin />} />
 
                 {/* Admin Routes */}
                 <Route path="/admin/login" element={<AdminLogin />} />

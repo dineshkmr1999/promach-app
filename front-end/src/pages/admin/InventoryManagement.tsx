@@ -1,30 +1,905 @@
+import { useState, useEffect, useCallback } from 'react';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Package } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import PromachLoader from '@/components/PromachLoader';
+import {
+    Package, MapPin, ArrowLeftRight, Briefcase, Wrench, Plus, Search, RefreshCw,
+    Warehouse, Truck, Building2, AlertTriangle, TrendingDown, CheckCircle2, Clock,
+    ChevronRight, Send, Download, Eye, Trash2, Edit, Users
+} from 'lucide-react';
+import { itemsAPI, locationsAPI, inventoryAPI, jobTicketsAPI, assetsAPI, erpAuthAPI } from '@/services/erpApi';
+import { useToast } from '@/hooks/use-toast';
+
+// ── Types ──
+interface MasterItem {
+    _id: string; sku: string; name: string; description?: string;
+    itemType: 'Consumable' | 'Asset' | 'Kit'; category?: string; uom: string;
+    unitCost: number; sellingPrice: number; reorderLevel: number;
+    assetTag?: string; assetStatus?: string; brand?: string; isActive: boolean;
+    currentHolder?: { _id: string; name: string };
+    currentLocation?: { _id: string; name: string; locationType: string };
+    kitComponents?: { item: { _id: string; name: string; sku: string; uom: string }; quantity: number }[];
+}
+interface Location {
+    _id: string; name: string; locationType: 'Warehouse' | 'Van' | 'Site';
+    address?: string; vehicleNumber?: string; isActive: boolean;
+    assignedTechnicians?: { _id: string; name: string }[];
+    parent?: { _id: string; name: string };
+}
+interface LedgerRow {
+    _id: string;
+    item: { _id: string; name: string; sku: string; uom: string; unitCost: number; sellingPrice: number; reorderLevel: number; itemType: string };
+    location: { _id: string; name: string; locationType: string };
+    quantityOnHand: number;
+}
+interface StockTransfer {
+    _id: string; transferNumber: string; status: string;
+    fromLocation: { _id: string; name: string; locationType: string };
+    toLocation: { _id: string; name: string; locationType: string };
+    items: { item: { _id: string; name: string; sku: string; uom: string }; quantity: number }[];
+    createdBy?: { _id: string; name: string }; receivedBy?: { _id: string; name: string };
+    createdAt: string; receivedAt?: string; notes?: string;
+}
+interface JobTicket {
+    _id: string; ticketNumber: string; jobType: string; status: string; priority: string;
+    customer: { name: string; phone?: string; email?: string };
+    siteAddress?: { street?: string; postalCode?: string; unit?: string };
+    scheduledDate: string; quotedPrice: number; totalMaterialCost: number; grossProfit: number;
+    assignedTechnicians?: { _id: string; name: string; phone?: string }[];
+    createdBy?: { _id: string; name: string };
+    costLines?: any[];
+}
+interface AssetItem extends MasterItem {}
+interface LowStockItem {
+    item: string; sku: string; uom: string; location: string; locationType: string;
+    quantityOnHand: number; reorderLevel: number;
+}
+
+// ── Helper: Status badge color ──
+function statusBadge(status: string) {
+    const map: Record<string, string> = {
+        Pending: 'bg-yellow-100 text-yellow-800',
+        In_Transit: 'bg-blue-100 text-blue-800',
+        Received: 'bg-green-100 text-green-800',
+        Cancelled: 'bg-red-100 text-red-800',
+        Draft: 'bg-slate-100 text-slate-600',
+        Scheduled: 'bg-blue-100 text-blue-800',
+        In_Progress: 'bg-amber-100 text-amber-800',
+        On_Hold: 'bg-orange-100 text-orange-800',
+        Completed: 'bg-green-100 text-green-800',
+        Invoiced: 'bg-purple-100 text-purple-800',
+        available: 'bg-green-100 text-green-800',
+        in_use: 'bg-blue-100 text-blue-800',
+        maintenance: 'bg-orange-100 text-orange-800',
+        retired: 'bg-slate-100 text-slate-600',
+    };
+    return <Badge className={`${map[status] || 'bg-slate-100 text-slate-600'} border-0 font-medium`}>{status.replace(/_/g, ' ')}</Badge>;
+}
 
 export default function InventoryManagement() {
+    const { toast } = useToast();
+    const [activeTab, setActiveTab] = useState('items');
+    const [isLoading, setIsLoading] = useState(false);
+
+    // ── Items state ──
+    const [items, setItems] = useState<MasterItem[]>([]);
+    const [itemsTotal, setItemsTotal] = useState(0);
+    const [itemSearch, setItemSearch] = useState('');
+    const [itemTypeFilter, setItemTypeFilter] = useState('');
+    const [showItemDialog, setShowItemDialog] = useState(false);
+    const [editingItem, setEditingItem] = useState<MasterItem | null>(null);
+    const [itemForm, setItemForm] = useState({ sku: '', name: '', description: '', itemType: 'Consumable', category: '', uom: 'Units', unitCost: '0', sellingPrice: '0', reorderLevel: '0', assetTag: '', brand: '' });
+
+    // ── Locations state ──
+    const [locations, setLocations] = useState<Location[]>([]);
+    const [showLocationDialog, setShowLocationDialog] = useState(false);
+    const [locationForm, setLocationForm] = useState({ name: '', locationType: 'Warehouse', address: '', vehicleNumber: '' });
+    const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
+    const [locationStock, setLocationStock] = useState<LedgerRow[]>([]);
+    const [loadingStock, setLoadingStock] = useState(false);
+
+    // ── Transfers state ──
+    const [transfers, setTransfers] = useState<StockTransfer[]>([]);
+    const [showTransferDialog, setShowTransferDialog] = useState(false);
+    const [transferForm, setTransferForm] = useState({ fromLocationId: '', toLocationId: '', notes: '', items: [{ itemId: '', quantity: '' }] });
+
+    // ── Jobs state ──
+    const [jobs, setJobs] = useState<JobTicket[]>([]);
+    const [jobsTotal, setJobsTotal] = useState(0);
+    const [jobStatusFilter, setJobStatusFilter] = useState('');
+    const [showJobDialog, setShowJobDialog] = useState(false);
+    const [jobForm, setJobForm] = useState({ jobType: 'Aircon_Service', customerName: '', customerPhone: '', customerEmail: '', street: '', postalCode: '', unit: '', scheduledDate: '', scheduledTimeSlot: '', quotedPrice: '0', priority: 'Normal', internalNotes: '' });
+
+    // ── Assets state ──
+    const [assets, setAssets] = useState<AssetItem[]>([]);
+    const [assetStatusFilter, setAssetStatusFilter] = useState('');
+
+    // ── Low stock ──
+    const [lowStock, setLowStock] = useState<LowStockItem[]>([]);
+
+    // ── Data loaders ──
+    const loadItems = useCallback(async () => {
+        setIsLoading(true);
+        try {
+            const params: Record<string, string> = {};
+            if (itemSearch) params.search = itemSearch;
+            if (itemTypeFilter) params.itemType = itemTypeFilter;
+            const data = await itemsAPI.list(params);
+            setItems(data.items); setItemsTotal(data.total);
+        } catch { toast({ title: 'Error', description: 'Failed to load items', variant: 'destructive' }); }
+        finally { setIsLoading(false); }
+    }, [itemSearch, itemTypeFilter, toast]);
+
+    const loadLocations = useCallback(async () => {
+        try { const data = await locationsAPI.list(); setLocations(data); }
+        catch { toast({ title: 'Error', description: 'Failed to load locations', variant: 'destructive' }); }
+    }, [toast]);
+
+    const loadTransfers = useCallback(async () => {
+        try { const data = await inventoryAPI.listTransfers(); setTransfers(data.transfers); }
+        catch { toast({ title: 'Error', description: 'Failed to load transfers', variant: 'destructive' }); }
+    }, [toast]);
+
+    const loadJobs = useCallback(async () => {
+        try {
+            const params: Record<string, string> = {};
+            if (jobStatusFilter) params.status = jobStatusFilter;
+            const data = await jobTicketsAPI.list(params);
+            setJobs(data.tickets); setJobsTotal(data.total);
+        } catch { toast({ title: 'Error', description: 'Failed to load jobs', variant: 'destructive' }); }
+    }, [jobStatusFilter, toast]);
+
+    const loadAssets = useCallback(async () => {
+        try {
+            const params: Record<string, string> = {};
+            if (assetStatusFilter) params.assetStatus = assetStatusFilter;
+            const data = await assetsAPI.list(params);
+            setAssets(data.assets);
+        } catch { toast({ title: 'Error', description: 'Failed to load assets', variant: 'destructive' }); }
+    }, [assetStatusFilter, toast]);
+
+    const loadLowStock = useCallback(async () => {
+        try { const data = await inventoryAPI.lowStock(); setLowStock(data); }
+        catch { /* Silently fail — user may not have access */ }
+    }, []);
+
+    // Load data on tab change
+    useEffect(() => {
+        if (activeTab === 'items') loadItems();
+        if (activeTab === 'locations') loadLocations();
+        if (activeTab === 'transfers') { loadTransfers(); loadLocations(); }
+        if (activeTab === 'jobs') loadJobs();
+        if (activeTab === 'assets') loadAssets();
+    }, [activeTab, loadItems, loadLocations, loadTransfers, loadJobs, loadAssets]);
+
+    // Load low stock on mount
+    useEffect(() => { loadLowStock(); }, [loadLowStock]);
+
+    // Load stock when a location is selected
+    useEffect(() => {
+        if (!selectedLocationId) { setLocationStock([]); return; }
+        setLoadingStock(true);
+        locationsAPI.getStock(selectedLocationId).then(setLocationStock).catch(() => {}).finally(() => setLoadingStock(false));
+    }, [selectedLocationId]);
+
+    // ── Item CRUD handlers ──
+    const openNewItem = () => {
+        setEditingItem(null);
+        setItemForm({ sku: '', name: '', description: '', itemType: 'Consumable', category: '', uom: 'Units', unitCost: '0', sellingPrice: '0', reorderLevel: '0', assetTag: '', brand: '' });
+        setShowItemDialog(true);
+    };
+    const openEditItem = (item: MasterItem) => {
+        setEditingItem(item);
+        setItemForm({
+            sku: item.sku, name: item.name, description: item.description || '',
+            itemType: item.itemType, category: item.category || '', uom: item.uom,
+            unitCost: String(item.unitCost), sellingPrice: String(item.sellingPrice),
+            reorderLevel: String(item.reorderLevel), assetTag: item.assetTag || '', brand: item.brand || ''
+        });
+        setShowItemDialog(true);
+    };
+    const handleSaveItem = async () => {
+        try {
+            const payload = { ...itemForm, unitCost: parseFloat(itemForm.unitCost) || 0, sellingPrice: parseFloat(itemForm.sellingPrice) || 0, reorderLevel: parseFloat(itemForm.reorderLevel) || 0 };
+            if (editingItem) { await itemsAPI.update(editingItem._id, payload); toast({ title: 'Item updated' }); }
+            else { await itemsAPI.create(payload); toast({ title: 'Item created' }); }
+            setShowItemDialog(false); loadItems();
+        } catch (err: any) { toast({ title: 'Error', description: err.message, variant: 'destructive' }); }
+    };
+    const handleDeleteItem = async (id: string) => {
+        try { await itemsAPI.remove(id); toast({ title: 'Item deactivated' }); loadItems(); }
+        catch (err: any) { toast({ title: 'Error', description: err.message, variant: 'destructive' }); }
+    };
+
+    // ── Location CRUD handlers ──
+    const handleSaveLocation = async () => {
+        try {
+            await locationsAPI.create(locationForm); toast({ title: 'Location created' });
+            setShowLocationDialog(false); loadLocations();
+        } catch (err: any) { toast({ title: 'Error', description: err.message, variant: 'destructive' }); }
+    };
+
+    // ── Transfer handlers ──
+    const handleCreateTransfer = async () => {
+        try {
+            const payload = {
+                fromLocationId: transferForm.fromLocationId,
+                toLocationId: transferForm.toLocationId,
+                notes: transferForm.notes,
+                items: transferForm.items.filter(i => i.itemId && i.quantity).map(i => ({ itemId: i.itemId, quantity: parseFloat(i.quantity) }))
+            };
+            await inventoryAPI.createTransfer(payload);
+            toast({ title: 'Transfer created' }); setShowTransferDialog(false); loadTransfers();
+        } catch (err: any) { toast({ title: 'Error', description: err.message, variant: 'destructive' }); }
+    };
+    const handleDispatch = async (id: string) => {
+        try { await inventoryAPI.dispatchTransfer(id); toast({ title: 'Transfer dispatched' }); loadTransfers(); }
+        catch (err: any) { toast({ title: 'Error', description: err.message, variant: 'destructive' }); }
+    };
+    const handleReceive = async (id: string) => {
+        try { await inventoryAPI.receiveTransfer(id); toast({ title: 'Transfer received' }); loadTransfers(); }
+        catch (err: any) { toast({ title: 'Error', description: err.message, variant: 'destructive' }); }
+    };
+
+    // ── Job ticket handlers ──
+    const handleCreateJob = async () => {
+        try {
+            const payload = {
+                jobType: jobForm.jobType,
+                customer: { name: jobForm.customerName, phone: jobForm.customerPhone, email: jobForm.customerEmail },
+                siteAddress: { street: jobForm.street, postalCode: jobForm.postalCode, unit: jobForm.unit },
+                scheduledDate: jobForm.scheduledDate, scheduledTimeSlot: jobForm.scheduledTimeSlot,
+                quotedPrice: parseFloat(jobForm.quotedPrice) || 0, priority: jobForm.priority,
+                internalNotes: jobForm.internalNotes
+            };
+            await jobTicketsAPI.create(payload); toast({ title: 'Job ticket created' });
+            setShowJobDialog(false); loadJobs();
+        } catch (err: any) { toast({ title: 'Error', description: err.message, variant: 'destructive' }); }
+    };
+
+    // ── Asset handlers ──
+    const handleCheckout = async (id: string) => {
+        try { await assetsAPI.checkout(id, {}); toast({ title: 'Asset checked out' }); loadAssets(); }
+        catch (err: any) { toast({ title: 'Error', description: err.message, variant: 'destructive' }); }
+    };
+    const handleCheckin = async (id: string) => {
+        try { await assetsAPI.checkin(id, { condition: 'good' }); toast({ title: 'Asset checked in' }); loadAssets(); }
+        catch (err: any) { toast({ title: 'Error', description: err.message, variant: 'destructive' }); }
+    };
+
+    const locationIcon = (type: string) => {
+        if (type === 'Warehouse') return <Warehouse size={16} className="text-blue-600" />;
+        if (type === 'Van') return <Truck size={16} className="text-amber-600" />;
+        return <Building2 size={16} className="text-violet-600" />;
+    };
+
     return (
         <AdminLayout>
-            <div className="max-w-5xl">
-                <h1 className="text-3xl font-bold mb-2">Inventory Management</h1>
-                <p className="text-gray-600 mb-8">Manage your products, parts, and stock levels</p>
+            <div className="space-y-6">
+                {/* Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div>
+                        <h1 className="text-3xl font-bold text-slate-900">Inventory Management</h1>
+                        <p className="text-slate-500 mt-1">Manage products, stock, transfers, jobs &amp; assets</p>
+                    </div>
 
-                <Card className="border-0 shadow-lg">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-3">
-                            <div className="p-2 bg-primary/10 rounded-lg">
-                                <Package className="w-6 h-6 text-primary" />
+                    {/* Low stock alert */}
+                    {lowStock.length > 0 && (
+                        <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2">
+                            <AlertTriangle size={18} className="text-amber-600" />
+                            <span className="text-sm font-medium text-amber-800">{lowStock.length} item(s) below reorder level</span>
+                        </div>
+                    )}
+                </div>
+
+                {/* Summary Cards */}
+                <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+                    {[
+                        { label: 'Master Items', value: itemsTotal, icon: Package, color: 'text-blue-600 bg-blue-50' },
+                        { label: 'Locations', value: locations.length, icon: MapPin, color: 'text-emerald-600 bg-emerald-50' },
+                        { label: 'Open Transfers', value: transfers.filter(t => t.status !== 'Received' && t.status !== 'Cancelled').length, icon: ArrowLeftRight, color: 'text-amber-600 bg-amber-50' },
+                        { label: 'Active Jobs', value: jobs.filter(j => !['Completed', 'Invoiced', 'Cancelled'].includes(j.status)).length, icon: Briefcase, color: 'text-violet-600 bg-violet-50' },
+                        { label: 'Low Stock', value: lowStock.length, icon: TrendingDown, color: lowStock.length > 0 ? 'text-red-600 bg-red-50' : 'text-slate-600 bg-slate-50' },
+                    ].map((s) => {
+                        const Icon = s.icon;
+                        return (
+                            <Card key={s.label} className="border-0 shadow-sm">
+                                <CardContent className="p-4 flex items-center gap-3">
+                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${s.color}`}>
+                                        <Icon size={20} />
+                                    </div>
+                                    <div>
+                                        <p className="text-2xl font-bold text-slate-900">{s.value}</p>
+                                        <p className="text-xs text-slate-500">{s.label}</p>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        );
+                    })}
+                </div>
+
+                {/* Tabs */}
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+                    <TabsList className="bg-slate-100 p-1 rounded-xl">
+                        <TabsTrigger value="items" className="rounded-lg gap-1.5 data-[state=active]:shadow-sm"><Package size={16} /> Items</TabsTrigger>
+                        <TabsTrigger value="locations" className="rounded-lg gap-1.5 data-[state=active]:shadow-sm"><MapPin size={16} /> Locations</TabsTrigger>
+                        <TabsTrigger value="transfers" className="rounded-lg gap-1.5 data-[state=active]:shadow-sm"><ArrowLeftRight size={16} /> Transfers</TabsTrigger>
+                        <TabsTrigger value="jobs" className="rounded-lg gap-1.5 data-[state=active]:shadow-sm"><Briefcase size={16} /> Jobs</TabsTrigger>
+                        <TabsTrigger value="assets" className="rounded-lg gap-1.5 data-[state=active]:shadow-sm"><Wrench size={16} /> Assets</TabsTrigger>
+                    </TabsList>
+
+                    {/* ═══════════════════ ITEMS TAB ═══════════════════ */}
+                    <TabsContent value="items" className="space-y-4">
+                        <div className="flex flex-col sm:flex-row gap-3">
+                            <div className="relative flex-1">
+                                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <Input placeholder="Search by name or SKU…" value={itemSearch} onChange={e => setItemSearch(e.target.value)} onKeyDown={e => e.key === 'Enter' && loadItems()} className="pl-9" />
                             </div>
-                            Coming Soon
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-gray-500">
-                            The Inventory Management module is being set up. You'll be able to manage products, track stock levels, and organize your inventory here.
-                        </p>
-                    </CardContent>
-                </Card>
+                            <Select value={itemTypeFilter} onValueChange={v => { setItemTypeFilter(v === 'all' ? '' : v); }}>
+                                <SelectTrigger className="w-[160px]"><SelectValue placeholder="All Types" /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Types</SelectItem>
+                                    <SelectItem value="Consumable">Consumable</SelectItem>
+                                    <SelectItem value="Asset">Asset / Tool</SelectItem>
+                                    <SelectItem value="Kit">Kit / Bundle</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <Button onClick={loadItems} variant="outline" size="icon"><RefreshCw size={16} /></Button>
+                            <Button onClick={openNewItem} className="gap-1.5"><Plus size={16} /> Add Item</Button>
+                        </div>
+
+                        <Card className="border-0 shadow-sm overflow-hidden">
+                            {isLoading ? <div className="p-8"><PromachLoader variant="inline" /></div> : (
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow className="bg-slate-50">
+                                            <TableHead className="font-semibold">SKU</TableHead>
+                                            <TableHead className="font-semibold">Name</TableHead>
+                                            <TableHead className="font-semibold">Type</TableHead>
+                                            <TableHead className="font-semibold">UoM</TableHead>
+                                            <TableHead className="font-semibold text-right">Cost (SGD)</TableHead>
+                                            <TableHead className="font-semibold text-right">Sell (SGD)</TableHead>
+                                            <TableHead className="font-semibold text-center">Actions</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {items.length === 0 ? (
+                                            <TableRow><TableCell colSpan={7} className="text-center text-slate-400 py-10">No items found. Click &quot;Add Item&quot; to create one.</TableCell></TableRow>
+                                        ) : items.map(item => (
+                                            <TableRow key={item._id} className="hover:bg-slate-50">
+                                                <TableCell className="font-mono text-xs">{item.sku}</TableCell>
+                                                <TableCell className="font-medium">{item.name}</TableCell>
+                                                <TableCell>{statusBadge(item.itemType)}</TableCell>
+                                                <TableCell className="text-slate-600">{item.uom}</TableCell>
+                                                <TableCell className="text-right font-mono">{item.unitCost.toFixed(2)}</TableCell>
+                                                <TableCell className="text-right font-mono">{item.sellingPrice.toFixed(2)}</TableCell>
+                                                <TableCell className="text-center">
+                                                    <div className="flex justify-center gap-1">
+                                                        <Button size="sm" variant="ghost" onClick={() => openEditItem(item)}><Edit size={14} /></Button>
+                                                        <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-700" onClick={() => handleDeleteItem(item._id)}><Trash2 size={14} /></Button>
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            )}
+                        </Card>
+                    </TabsContent>
+
+                    {/* ═══════════════════ LOCATIONS TAB ═══════════════════ */}
+                    <TabsContent value="locations" className="space-y-4">
+                        <div className="flex justify-between items-center">
+                            <p className="text-sm text-slate-500">{locations.length} location(s)</p>
+                            <Button onClick={() => { setLocationForm({ name: '', locationType: 'Warehouse', address: '', vehicleNumber: '' }); setShowLocationDialog(true); }} className="gap-1.5"><Plus size={16} /> Add Location</Button>
+                        </div>
+
+                        <div className="grid lg:grid-cols-3 gap-6">
+                            {/* Location List */}
+                            <div className="lg:col-span-1 space-y-2">
+                                {locations.length === 0 ? (
+                                    <Card className="border-0 shadow-sm"><CardContent className="p-8 text-center text-slate-400">No locations yet</CardContent></Card>
+                                ) : locations.map(loc => (
+                                    <button
+                                        key={loc._id}
+                                        onClick={() => setSelectedLocationId(loc._id === selectedLocationId ? null : loc._id)}
+                                        className={`w-full text-left p-4 rounded-xl border transition-all duration-200 ${selectedLocationId === loc._id ? 'border-primary bg-primary/5 shadow-sm' : 'border-slate-200 bg-white hover:border-slate-300'}`}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            {locationIcon(loc.locationType)}
+                                            <div className="flex-1 min-w-0">
+                                                <p className="font-medium text-slate-900 truncate">{loc.name}</p>
+                                                <p className="text-xs text-slate-500">{loc.locationType}{loc.vehicleNumber ? ` · ${loc.vehicleNumber}` : ''}</p>
+                                            </div>
+                                            <ChevronRight size={16} className={`text-slate-400 transition-transform ${selectedLocationId === loc._id ? 'rotate-90' : ''}`} />
+                                        </div>
+                                        {loc.assignedTechnicians && loc.assignedTechnicians.length > 0 && (
+                                            <div className="mt-2 flex items-center gap-1 text-xs text-slate-500">
+                                                <Users size={12} />
+                                                {loc.assignedTechnicians.map(t => t.name).join(', ')}
+                                            </div>
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* Stock at selected location */}
+                            <div className="lg:col-span-2">
+                                <Card className="border-0 shadow-sm">
+                                    <CardHeader className="pb-3">
+                                        <CardTitle className="text-lg">
+                                            {selectedLocationId ? `Stock at ${locations.find(l => l._id === selectedLocationId)?.name || '…'}` : 'Select a location to view stock'}
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        {!selectedLocationId ? (
+                                            <p className="text-slate-400 text-sm py-4 text-center">Click a location on the left to view its inventory</p>
+                                        ) : loadingStock ? (
+                                            <PromachLoader variant="inline" />
+                                        ) : locationStock.length === 0 ? (
+                                            <p className="text-slate-400 text-sm py-4 text-center">No stock at this location</p>
+                                        ) : (
+                                            <Table>
+                                                <TableHeader>
+                                                    <TableRow className="bg-slate-50">
+                                                        <TableHead className="font-semibold">Item</TableHead>
+                                                        <TableHead className="font-semibold">SKU</TableHead>
+                                                        <TableHead className="font-semibold text-right">Qty</TableHead>
+                                                        <TableHead className="font-semibold">UoM</TableHead>
+                                                        <TableHead className="font-semibold text-center">Status</TableHead>
+                                                    </TableRow>
+                                                </TableHeader>
+                                                <TableBody>
+                                                    {locationStock.map(row => {
+                                                        const belowReorder = row.item.reorderLevel > 0 && row.quantityOnHand <= row.item.reorderLevel;
+                                                        return (
+                                                            <TableRow key={row._id} className={belowReorder ? 'bg-red-50' : ''}>
+                                                                <TableCell className="font-medium">{row.item.name}</TableCell>
+                                                                <TableCell className="font-mono text-xs">{row.item.sku}</TableCell>
+                                                                <TableCell className="text-right font-mono font-bold">{row.quantityOnHand}</TableCell>
+                                                                <TableCell className="text-slate-600">{row.item.uom}</TableCell>
+                                                                <TableCell className="text-center">
+                                                                    {belowReorder ? <Badge className="bg-red-100 text-red-800 border-0">Low</Badge> : <Badge className="bg-green-100 text-green-800 border-0">OK</Badge>}
+                                                                </TableCell>
+                                                            </TableRow>
+                                                        );
+                                                    })}
+                                                </TableBody>
+                                            </Table>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            </div>
+                        </div>
+                    </TabsContent>
+
+                    {/* ═══════════════════ TRANSFERS TAB ═══════════════════ */}
+                    <TabsContent value="transfers" className="space-y-4">
+                        <div className="flex justify-between items-center">
+                            <p className="text-sm text-slate-500">{transfers.length} transfer(s)</p>
+                            <Button onClick={() => { setTransferForm({ fromLocationId: '', toLocationId: '', notes: '', items: [{ itemId: '', quantity: '' }] }); setShowTransferDialog(true); }} className="gap-1.5"><Plus size={16} /> New Transfer</Button>
+                        </div>
+
+                        <Card className="border-0 shadow-sm overflow-hidden">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow className="bg-slate-50">
+                                        <TableHead className="font-semibold">Transfer #</TableHead>
+                                        <TableHead className="font-semibold">From</TableHead>
+                                        <TableHead className="font-semibold">To</TableHead>
+                                        <TableHead className="font-semibold">Items</TableHead>
+                                        <TableHead className="font-semibold">Status</TableHead>
+                                        <TableHead className="font-semibold">Date</TableHead>
+                                        <TableHead className="font-semibold text-center">Actions</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {transfers.length === 0 ? (
+                                        <TableRow><TableCell colSpan={7} className="text-center text-slate-400 py-10">No transfers yet</TableCell></TableRow>
+                                    ) : transfers.map(t => (
+                                        <TableRow key={t._id} className="hover:bg-slate-50">
+                                            <TableCell className="font-mono text-sm font-medium">{t.transferNumber}</TableCell>
+                                            <TableCell><div className="flex items-center gap-1.5">{locationIcon(t.fromLocation.locationType)}<span className="text-sm">{t.fromLocation.name}</span></div></TableCell>
+                                            <TableCell><div className="flex items-center gap-1.5">{locationIcon(t.toLocation.locationType)}<span className="text-sm">{t.toLocation.name}</span></div></TableCell>
+                                            <TableCell className="text-sm">{t.items.length} item(s)</TableCell>
+                                            <TableCell>{statusBadge(t.status)}</TableCell>
+                                            <TableCell className="text-sm text-slate-500">{new Date(t.createdAt).toLocaleDateString()}</TableCell>
+                                            <TableCell className="text-center">
+                                                <div className="flex justify-center gap-1.5">
+                                                    {t.status === 'Pending' && (
+                                                        <Button size="sm" variant="outline" className="gap-1 text-xs" onClick={() => handleDispatch(t._id)}><Send size={12} /> Dispatch</Button>
+                                                    )}
+                                                    {t.status === 'In_Transit' && (
+                                                        <Button size="sm" className="gap-1 text-xs" onClick={() => handleReceive(t._id)}><Download size={12} /> Receive</Button>
+                                                    )}
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </Card>
+                    </TabsContent>
+
+                    {/* ═══════════════════ JOBS TAB ═══════════════════ */}
+                    <TabsContent value="jobs" className="space-y-4">
+                        <div className="flex flex-col sm:flex-row gap-3 justify-between items-start sm:items-center">
+                            <Select value={jobStatusFilter} onValueChange={v => setJobStatusFilter(v === 'all' ? '' : v)}>
+                                <SelectTrigger className="w-[180px]"><SelectValue placeholder="All Statuses" /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Statuses</SelectItem>
+                                    {['Draft', 'Scheduled', 'In_Progress', 'On_Hold', 'Completed', 'Invoiced', 'Cancelled'].map(s => (
+                                        <SelectItem key={s} value={s}>{s.replace(/_/g, ' ')}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <div className="flex gap-2">
+                                <Button variant="outline" onClick={loadJobs} size="icon"><RefreshCw size={16} /></Button>
+                                <Button onClick={() => { setJobForm({ jobType: 'Aircon_Service', customerName: '', customerPhone: '', customerEmail: '', street: '', postalCode: '', unit: '', scheduledDate: '', scheduledTimeSlot: '', quotedPrice: '0', priority: 'Normal', internalNotes: '' }); setShowJobDialog(true); }} className="gap-1.5"><Plus size={16} /> New Job</Button>
+                            </div>
+                        </div>
+
+                        <Card className="border-0 shadow-sm overflow-hidden">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow className="bg-slate-50">
+                                        <TableHead className="font-semibold">Ticket</TableHead>
+                                        <TableHead className="font-semibold">Customer</TableHead>
+                                        <TableHead className="font-semibold">Type</TableHead>
+                                        <TableHead className="font-semibold">Scheduled</TableHead>
+                                        <TableHead className="font-semibold">Priority</TableHead>
+                                        <TableHead className="font-semibold">Status</TableHead>
+                                        <TableHead className="font-semibold text-right">Quoted</TableHead>
+                                        <TableHead className="font-semibold text-right">Cost</TableHead>
+                                        <TableHead className="font-semibold text-right">Profit</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {jobs.length === 0 ? (
+                                        <TableRow><TableCell colSpan={9} className="text-center text-slate-400 py-10">No job tickets</TableCell></TableRow>
+                                    ) : jobs.map(job => (
+                                        <TableRow key={job._id} className="hover:bg-slate-50">
+                                            <TableCell className="font-mono text-sm font-medium">{job.ticketNumber}</TableCell>
+                                            <TableCell>
+                                                <p className="font-medium text-sm">{job.customer.name}</p>
+                                                {job.customer.phone && <p className="text-xs text-slate-500">{job.customer.phone}</p>}
+                                            </TableCell>
+                                            <TableCell className="text-sm">{job.jobType.replace(/_/g, ' ')}</TableCell>
+                                            <TableCell className="text-sm">{new Date(job.scheduledDate).toLocaleDateString()}</TableCell>
+                                            <TableCell>{statusBadge(job.priority)}</TableCell>
+                                            <TableCell>{statusBadge(job.status)}</TableCell>
+                                            <TableCell className="text-right font-mono">${job.quotedPrice.toFixed(2)}</TableCell>
+                                            <TableCell className="text-right font-mono">${job.totalMaterialCost.toFixed(2)}</TableCell>
+                                            <TableCell className={`text-right font-mono font-bold ${job.grossProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>${job.grossProfit.toFixed(2)}</TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </Card>
+                    </TabsContent>
+
+                    {/* ═══════════════════ ASSETS TAB ═══════════════════ */}
+                    <TabsContent value="assets" className="space-y-4">
+                        <div className="flex gap-3 justify-between items-center">
+                            <Select value={assetStatusFilter} onValueChange={v => setAssetStatusFilter(v === 'all' ? '' : v)}>
+                                <SelectTrigger className="w-[160px]"><SelectValue placeholder="All Statuses" /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Statuses</SelectItem>
+                                    <SelectItem value="available">Available</SelectItem>
+                                    <SelectItem value="in_use">In Use</SelectItem>
+                                    <SelectItem value="maintenance">Maintenance</SelectItem>
+                                    <SelectItem value="retired">Retired</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <Button variant="outline" onClick={loadAssets} size="icon"><RefreshCw size={16} /></Button>
+                        </div>
+
+                        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {assets.length === 0 ? (
+                                <div className="col-span-full text-center text-slate-400 py-10">No assets found. Add items with type &quot;Asset&quot; in the Items tab.</div>
+                            ) : assets.map(a => (
+                                <Card key={a._id} className="border-0 shadow-sm hover:shadow-md transition-shadow">
+                                    <CardContent className="p-5">
+                                        <div className="flex items-start justify-between mb-3">
+                                            <div>
+                                                <p className="font-bold text-slate-900">{a.name}</p>
+                                                {a.assetTag && <p className="text-xs font-mono text-slate-500">Tag: {a.assetTag}</p>}
+                                            </div>
+                                            {statusBadge(a.assetStatus || 'available')}
+                                        </div>
+                                        <div className="space-y-1 text-sm text-slate-600 mb-4">
+                                            <p>SKU: <span className="font-mono">{a.sku}</span></p>
+                                            {a.currentHolder && <p>Holder: <span className="font-medium">{a.currentHolder.name}</span></p>}
+                                            {a.currentLocation && <p>Location: {a.currentLocation.name}</p>}
+                                        </div>
+                                        <div className="flex gap-2">
+                                            {a.assetStatus === 'available' && (
+                                                <Button size="sm" className="flex-1 gap-1" onClick={() => handleCheckout(a._id)}>
+                                                    <Wrench size={14} /> Check Out
+                                                </Button>
+                                            )}
+                                            {a.assetStatus === 'in_use' && (
+                                                <Button size="sm" variant="outline" className="flex-1 gap-1" onClick={() => handleCheckin(a._id)}>
+                                                    <CheckCircle2 size={14} /> Check In
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            ))}
+                        </div>
+                    </TabsContent>
+                </Tabs>
             </div>
+
+            {/* ══════════════ DIALOGS ══════════════ */}
+
+            {/* Item Dialog */}
+            <Dialog open={showItemDialog} onOpenChange={setShowItemDialog}>
+                <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>{editingItem ? 'Edit Item' : 'Add New Item'}</DialogTitle>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-2">
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <Label>SKU</Label>
+                                <Input value={itemForm.sku} onChange={e => setItemForm(p => ({ ...p, sku: e.target.value }))} placeholder="e.g. GAS-R32-L" />
+                            </div>
+                            <div>
+                                <Label>Type</Label>
+                                <Select value={itemForm.itemType} onValueChange={v => setItemForm(p => ({ ...p, itemType: v }))}>
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="Consumable">Consumable</SelectItem>
+                                        <SelectItem value="Asset">Asset / Tool</SelectItem>
+                                        <SelectItem value="Kit">Kit / Bundle</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+                        <div>
+                            <Label>Name</Label>
+                            <Input value={itemForm.name} onChange={e => setItemForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. Refrigerant Gas R32" />
+                        </div>
+                        <div>
+                            <Label>Description</Label>
+                            <Textarea value={itemForm.description} onChange={e => setItemForm(p => ({ ...p, description: e.target.value }))} rows={2} />
+                        </div>
+                        <div className="grid grid-cols-3 gap-3">
+                            <div>
+                                <Label>UoM</Label>
+                                <Input value={itemForm.uom} onChange={e => setItemForm(p => ({ ...p, uom: e.target.value }))} placeholder="Units" />
+                            </div>
+                            <div>
+                                <Label>Category</Label>
+                                <Input value={itemForm.category} onChange={e => setItemForm(p => ({ ...p, category: e.target.value }))} placeholder="e.g. Gas" />
+                            </div>
+                            <div>
+                                <Label>Brand</Label>
+                                <Input value={itemForm.brand} onChange={e => setItemForm(p => ({ ...p, brand: e.target.value }))} placeholder="e.g. Daikin" />
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-3 gap-3">
+                            <div>
+                                <Label>Unit Cost (SGD)</Label>
+                                <Input type="number" step="0.01" value={itemForm.unitCost} onChange={e => setItemForm(p => ({ ...p, unitCost: e.target.value }))} />
+                            </div>
+                            <div>
+                                <Label>Selling Price</Label>
+                                <Input type="number" step="0.01" value={itemForm.sellingPrice} onChange={e => setItemForm(p => ({ ...p, sellingPrice: e.target.value }))} />
+                            </div>
+                            <div>
+                                <Label>Reorder Level</Label>
+                                <Input type="number" step="0.01" value={itemForm.reorderLevel} onChange={e => setItemForm(p => ({ ...p, reorderLevel: e.target.value }))} />
+                            </div>
+                        </div>
+                        {itemForm.itemType === 'Asset' && (
+                            <div>
+                                <Label>Asset Tag</Label>
+                                <Input value={itemForm.assetTag} onChange={e => setItemForm(p => ({ ...p, assetTag: e.target.value }))} placeholder="e.g. TOOL-VP-001" />
+                            </div>
+                        )}
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowItemDialog(false)}>Cancel</Button>
+                        <Button onClick={handleSaveItem}>{editingItem ? 'Update' : 'Create'}</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Location Dialog */}
+            <Dialog open={showLocationDialog} onOpenChange={setShowLocationDialog}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Add Location</DialogTitle>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-2">
+                        <div>
+                            <Label>Name</Label>
+                            <Input value={locationForm.name} onChange={e => setLocationForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. Main Warehouse" />
+                        </div>
+                        <div>
+                            <Label>Type</Label>
+                            <Select value={locationForm.locationType} onValueChange={v => setLocationForm(p => ({ ...p, locationType: v }))}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="Warehouse">Warehouse</SelectItem>
+                                    <SelectItem value="Van">Van / Vehicle</SelectItem>
+                                    <SelectItem value="Site">Project Site</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div>
+                            <Label>Address</Label>
+                            <Input value={locationForm.address} onChange={e => setLocationForm(p => ({ ...p, address: e.target.value }))} placeholder="Optional" />
+                        </div>
+                        {locationForm.locationType === 'Van' && (
+                            <div>
+                                <Label>Vehicle Number</Label>
+                                <Input value={locationForm.vehicleNumber} onChange={e => setLocationForm(p => ({ ...p, vehicleNumber: e.target.value }))} placeholder="e.g. SGX1234A" />
+                            </div>
+                        )}
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowLocationDialog(false)}>Cancel</Button>
+                        <Button onClick={handleSaveLocation}>Create</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Transfer Dialog */}
+            <Dialog open={showTransferDialog} onOpenChange={setShowTransferDialog}>
+                <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>Create Stock Transfer</DialogTitle>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-2">
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <Label>From Location</Label>
+                                <Select value={transferForm.fromLocationId} onValueChange={v => setTransferForm(p => ({ ...p, fromLocationId: v }))}>
+                                    <SelectTrigger><SelectValue placeholder="Select…" /></SelectTrigger>
+                                    <SelectContent>
+                                        {locations.map(l => <SelectItem key={l._id} value={l._id}>{l.name} ({l.locationType})</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div>
+                                <Label>To Location</Label>
+                                <Select value={transferForm.toLocationId} onValueChange={v => setTransferForm(p => ({ ...p, toLocationId: v }))}>
+                                    <SelectTrigger><SelectValue placeholder="Select…" /></SelectTrigger>
+                                    <SelectContent>
+                                        {locations.filter(l => l._id !== transferForm.fromLocationId).map(l => <SelectItem key={l._id} value={l._id}>{l.name} ({l.locationType})</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+
+                        <div>
+                            <Label>Items</Label>
+                            <div className="space-y-2 mt-1">
+                                {transferForm.items.map((line, idx) => (
+                                    <div key={idx} className="flex gap-2">
+                                        <Select value={line.itemId} onValueChange={v => { const arr = [...transferForm.items]; arr[idx].itemId = v; setTransferForm(p => ({ ...p, items: arr })); }}>
+                                            <SelectTrigger className="flex-1"><SelectValue placeholder="Select item…" /></SelectTrigger>
+                                            <SelectContent>
+                                                {items.map(i => <SelectItem key={i._id} value={i._id}>{i.name} ({i.sku})</SelectItem>)}
+                                            </SelectContent>
+                                        </Select>
+                                        <Input type="number" step="0.01" className="w-24" placeholder="Qty" value={line.quantity} onChange={e => { const arr = [...transferForm.items]; arr[idx].quantity = e.target.value; setTransferForm(p => ({ ...p, items: arr })); }} />
+                                        {transferForm.items.length > 1 && (
+                                            <Button variant="ghost" size="icon" className="text-red-500" onClick={() => { const arr = transferForm.items.filter((_, i) => i !== idx); setTransferForm(p => ({ ...p, items: arr })); }}><Trash2 size={14} /></Button>
+                                        )}
+                                    </div>
+                                ))}
+                                <Button variant="outline" size="sm" className="gap-1" onClick={() => setTransferForm(p => ({ ...p, items: [...p.items, { itemId: '', quantity: '' }] }))}><Plus size={14} /> Add Line</Button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <Label>Notes</Label>
+                            <Textarea value={transferForm.notes} onChange={e => setTransferForm(p => ({ ...p, notes: e.target.value }))} rows={2} />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowTransferDialog(false)}>Cancel</Button>
+                        <Button onClick={handleCreateTransfer}>Create Transfer</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Job Ticket Dialog */}
+            <Dialog open={showJobDialog} onOpenChange={setShowJobDialog}>
+                <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>Create Job Ticket</DialogTitle>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-2">
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <Label>Job Type</Label>
+                                <Select value={jobForm.jobType} onValueChange={v => setJobForm(p => ({ ...p, jobType: v }))}>
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        {['Aircon_Service', 'Aircon_Install', 'Aircon_Repair', 'Renovation', 'Maintenance_Contract', 'Other'].map(t => (
+                                            <SelectItem key={t} value={t}>{t.replace(/_/g, ' ')}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div>
+                                <Label>Priority</Label>
+                                <Select value={jobForm.priority} onValueChange={v => setJobForm(p => ({ ...p, priority: v }))}>
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        {['Low', 'Normal', 'High', 'Urgent'].map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+                        <div>
+                            <Label>Customer Name</Label>
+                            <Input value={jobForm.customerName} onChange={e => setJobForm(p => ({ ...p, customerName: e.target.value }))} required />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <Label>Phone</Label>
+                                <Input value={jobForm.customerPhone} onChange={e => setJobForm(p => ({ ...p, customerPhone: e.target.value }))} />
+                            </div>
+                            <div>
+                                <Label>Email</Label>
+                                <Input type="email" value={jobForm.customerEmail} onChange={e => setJobForm(p => ({ ...p, customerEmail: e.target.value }))} />
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-3 gap-3">
+                            <div>
+                                <Label>Street</Label>
+                                <Input value={jobForm.street} onChange={e => setJobForm(p => ({ ...p, street: e.target.value }))} />
+                            </div>
+                            <div>
+                                <Label>Unit</Label>
+                                <Input value={jobForm.unit} onChange={e => setJobForm(p => ({ ...p, unit: e.target.value }))} placeholder="#01-01" />
+                            </div>
+                            <div>
+                                <Label>Postal Code</Label>
+                                <Input value={jobForm.postalCode} onChange={e => setJobForm(p => ({ ...p, postalCode: e.target.value }))} />
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <Label>Scheduled Date</Label>
+                                <Input type="date" value={jobForm.scheduledDate} onChange={e => setJobForm(p => ({ ...p, scheduledDate: e.target.value }))} />
+                            </div>
+                            <div>
+                                <Label>Time Slot</Label>
+                                <Input value={jobForm.scheduledTimeSlot} onChange={e => setJobForm(p => ({ ...p, scheduledTimeSlot: e.target.value }))} placeholder="09:00-12:00" />
+                            </div>
+                        </div>
+                        <div>
+                            <Label>Quoted Price (SGD)</Label>
+                            <Input type="number" step="0.01" value={jobForm.quotedPrice} onChange={e => setJobForm(p => ({ ...p, quotedPrice: e.target.value }))} />
+                        </div>
+                        <div>
+                            <Label>Internal Notes</Label>
+                            <Textarea value={jobForm.internalNotes} onChange={e => setJobForm(p => ({ ...p, internalNotes: e.target.value }))} rows={2} />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowJobDialog(false)}>Cancel</Button>
+                        <Button onClick={handleCreateJob}>Create Job</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </AdminLayout>
     );
 }
