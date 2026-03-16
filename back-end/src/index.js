@@ -104,6 +104,7 @@ app.use('/api/submissions', submissionLimiter, require('./routes/submissions'));
 app.post('/api/erp/auth/login', authLimiter);
 app.use('/api/erp/auth', require('./routes/erpAuth'));
 app.use('/api/erp/items', require('./routes/items'));
+app.use('/api/erp/categories', require('./routes/categories'));
 app.use('/api/erp/locations', require('./routes/locations'));
 app.use('/api/erp/inventory', require('./routes/inventory'));
 app.use('/api/erp/jobs', require('./routes/jobTickets'));

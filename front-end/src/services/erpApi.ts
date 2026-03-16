@@ -46,6 +46,21 @@ export const erpAuthAPI = {
     erpFetch(`/auth/users/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
 };
 
+// ── Categories ──
+export const categoriesAPI = {
+  list: (params?: Record<string, string>) => {
+    const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+    return erpFetch(`/categories${qs}`);
+  },
+  get: (id: string) => erpFetch(`/categories/${id}`),
+  create: (data: any) =>
+    erpFetch('/categories', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: string, data: any) =>
+    erpFetch(`/categories/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  remove: (id: string) =>
+    erpFetch(`/categories/${id}`, { method: 'DELETE' }),
+};
+
 // ── Master Items ──
 export const itemsAPI = {
   list: (params?: Record<string, string>) => {
