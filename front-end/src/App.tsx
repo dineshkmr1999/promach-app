@@ -37,6 +37,7 @@ const CROSettingsManagement = lazy(() => import("./pages/admin/CROSettingsManage
 const InventoryManagement = lazy(() => import("./pages/admin/InventoryManagement"));
 const UserManagement = lazy(() => import("./pages/admin/UserManagement"));
 const StaffLogin = lazy(() => import("./pages/staff/StaffLogin"));
+const StaffDashboard = lazy(() => import("./pages/staff/StaffDashboard"));
 
 const queryClient = new QueryClient();
 
@@ -60,6 +61,7 @@ const App = () => (
 
                 {/* Staff Portal */}
                 <Route path="/staff/login" element={<StaffLogin />} />
+                <Route path="/staff/dashboard" element={<StaffDashboard />} />
 
                 {/* Admin Routes */}
                 <Route path="/admin/login" element={<AdminLogin />} />

@@ -14,10 +14,15 @@ async function erpFetch(path: string, opts: RequestInit = {}) {
     headers: { ...erpHeaders(), ...(opts.headers || {}) },
   });
   if (res.status === 401) {
+    // Determine which login page to redirect to
+    const hasAdminToken = !!localStorage.getItem('adminToken');
     localStorage.removeItem('erpToken');
     localStorage.removeItem('erpUser');
-    window.location.href = '/staff/login';
-    throw new Error('Session expired');
+    // If user is an admin (in admin panel), go to admin login, not staff login
+    if (!hasAdminToken) {
+      window.location.href = '/staff/login';
+    }
+    throw new Error('Session expired — please log in again');
   }
   if (!res.ok) {
     const body = await res.json().catch(() => ({ message: 'Request failed' }));

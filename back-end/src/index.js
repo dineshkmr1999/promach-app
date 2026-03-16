@@ -100,7 +100,9 @@ app.use('/api/analytics', require('./routes/analytics'));
 app.use('/api/submissions', submissionLimiter, require('./routes/submissions'));
 
 // ERP Routes (JWT-protected via erpAuth middleware inside each router)
-app.use('/api/erp/auth', authLimiter, require('./routes/erpAuth'));
+// Only rate-limit the login endpoint, not user-management endpoints
+app.post('/api/erp/auth/login', authLimiter);
+app.use('/api/erp/auth', require('./routes/erpAuth'));
 app.use('/api/erp/items', require('./routes/items'));
 app.use('/api/erp/locations', require('./routes/locations'));
 app.use('/api/erp/inventory', require('./routes/inventory'));
