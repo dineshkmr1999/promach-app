@@ -11,12 +11,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import PromachLoader from '@/components/PromachLoader';
+import InventoryGuide from '@/components/admin/InventoryGuide';
 import {
     Package, MapPin, ArrowLeftRight, Briefcase, Wrench, Plus, Search, RefreshCw,
     Warehouse, Truck, Building2, AlertTriangle, TrendingDown, CheckCircle2, Clock,
     ChevronRight, Send, Download, Eye, Trash2, Edit, Users, ShoppingCart,
     FileText, BarChart3, ClipboardCheck, DollarSign, Loader2, Upload, FileSpreadsheet,
-    X, ChevronDown, ChevronUp, Hash, Calendar, TrendingUp, Activity
+    X, ChevronDown, ChevronUp, Hash, Calendar, TrendingUp, Activity, BookOpen
 } from 'lucide-react';
 import { itemsAPI, locationsAPI, inventoryAPI, jobTicketsAPI, assetsAPI, erpAuthAPI, purchaseOrdersAPI } from '@/services/erpApi';
 import { useToast } from '@/hooks/use-toast';
@@ -173,6 +174,9 @@ export default function InventoryManagement() {
 
     // ── Item Detail View ──
     const [selectedItem, setSelectedItem] = useState<MasterItem | null>(null);
+
+    // ── Walkthrough Guide ──
+    const [showGuide, setShowGuide] = useState(false);
 
     // ── Data loaders ──
     const loadItems = useCallback(async () => {
@@ -430,13 +434,18 @@ export default function InventoryManagement() {
                         <p className="text-slate-500 mt-1">Manage products, stock, transfers, jobs &amp; assets</p>
                     </div>
 
-                    {/* Low stock alert */}
-                    {lowStock.length > 0 && (
-                        <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2">
-                            <AlertTriangle size={18} className="text-amber-600" />
-                            <span className="text-sm font-medium text-amber-800">{lowStock.length} item(s) below reorder level</span>
-                        </div>
-                    )}
+                    <div className="flex items-center gap-2">
+                        <Button variant="outline" onClick={() => setShowGuide(true)} className="gap-1.5 rounded-xl">
+                            <BookOpen size={16} /> User Guide
+                        </Button>
+                        {/* Low stock alert */}
+                        {lowStock.length > 0 && (
+                            <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2">
+                                <AlertTriangle size={18} className="text-amber-600" />
+                                <span className="text-sm font-medium text-amber-800">{lowStock.length} item(s) below reorder level</span>
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {/* Summary Cards */}
@@ -1527,6 +1536,9 @@ export default function InventoryManagement() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* ═══════════════════ WALKTHROUGH GUIDE ═══════════════════ */}
+            <InventoryGuide open={showGuide} onClose={() => setShowGuide(false)} />
 
             {/* ═══════════════════ ITEM DETAIL DIALOG ═══════════════════ */}
             <Dialog open={!!selectedItem} onOpenChange={() => setSelectedItem(null)}>

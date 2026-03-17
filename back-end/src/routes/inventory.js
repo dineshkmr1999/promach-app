@@ -119,7 +119,10 @@ router.patch('/transfer/:id/dispatch', requireRole('Admin', 'Operations_Manager'
                 }).session(session);
 
                 if (!ledger || parseFloat(ledger.quantityOnHand.toString()) < qty) {
-                    throw new Error(`Insufficient stock for item ${line.item} at source location`);
+                    const itemDoc = await MasterItem.findById(line.item).select('name sku').session(session);
+                    const itemLabel = itemDoc ? `${itemDoc.name} (${itemDoc.sku})` : String(line.item);
+                    const onHand = ledger ? parseFloat(ledger.quantityOnHand.toString()) : 0;
+                    throw new Error(`Insufficient stock for "${itemLabel}" — need ${qty}, only ${onHand} on hand at source location. Please receive stock first.`);
                 }
 
                 await InventoryLedger.updateOne(
