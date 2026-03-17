@@ -9,9 +9,10 @@ import {
   HardHat, LogOut, Briefcase, Wrench, MapPin, Clock, Phone,
   ChevronRight, AlertTriangle, CheckCircle2, Play, Pause, Camera,
   Navigation, User, Calendar, Truck, ArrowRight, Clipboard,
-  RefreshCw, Loader2, X, Timer, Star, History, DollarSign, MapPinCheck
+  RefreshCw, Loader2, X, Timer, Star, History, DollarSign, MapPinCheck,
+  ShoppingCart, Plus, Trash2, Package, Send
 } from 'lucide-react';
-import { jobTicketsAPI, assetsAPI, erpAuthAPI } from '@/services/erpApi';
+import { jobTicketsAPI, assetsAPI, erpAuthAPI, purchaseOrdersAPI, itemsAPI, locationsAPI } from '@/services/erpApi';
 import { useToast } from '@/hooks/use-toast';
 
 interface ERPUser {
@@ -43,6 +44,15 @@ interface HistoryInsights {
   totalJobs: number; totalRevenue: number; totalCost: number; totalProfit: number;
   avgDuration: number; avgRating: number; ratingCount: number;
 }
+interface PurchaseOrder {
+  _id: string; poNumber: string; status: string; totalAmount: number;
+  supplier: { name: string; code?: string };
+  deliverTo?: { _id: string; name: string };
+  lines: { item: any; quantity: number; unitCost: number; receivedQuantity: number }[];
+  createdAt: string;
+}
+interface SimpleItem { _id: string; name: string; sku: string; }
+interface SimpleLocation { _id: string; name: string; }
 
 const priorityColor: Record<string, string> = {
   Urgent: 'bg-red-500 text-white', High: 'bg-orange-100 text-orange-700',
@@ -69,7 +79,7 @@ export default function StaffDashboard() {
   const navigate = useNavigate();
   const [user, setUser] = useState<ERPUser | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeView, setActiveView] = useState<'home' | 'jobs' | 'tools' | 'history' | 'profile'>('home');
+  const [activeView, setActiveView] = useState<'home' | 'jobs' | 'tools' | 'history' | 'orders' | 'profile'>('home');
 
   const [jobs, setJobs] = useState<JobTicket[]>([]);
   const [selectedJob, setSelectedJob] = useState<JobTicket | null>(null);
@@ -89,6 +99,24 @@ export default function StaffDashboard() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadType, setUploadType] = useState<'before' | 'after'>('before');
   const [uploading, setUploading] = useState(false);
+
+  // PO state
+  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
+  const [loadingPOs, setLoadingPOs] = useState(false);
+  const [showPOForm, setShowPOForm] = useState(false);
+  const [poItems, setPOItems] = useState<SimpleItem[]>([]);
+  const [poLocations, setPOLocations] = useState<SimpleLocation[]>([]);
+  const [creatingPO, setCreatingPO] = useState(false);
+  const [poForm, setPOForm] = useState({
+    supplierName: '', supplierCode: '', deliverTo: '', expectedDeliveryDate: '', notes: '',
+    lines: [{ itemId: '', quantity: '', unitCost: '' }] as { itemId: string; quantity: string; unitCost: string }[]
+  });
+
+  // PO detail + quick item
+  const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
+  const [showQuickItemForm, setShowQuickItemForm] = useState(false);
+  const [quickItemForm, setQuickItemForm] = useState({ sku: '', name: '', itemType: 'Consumable', uom: 'Units', unitCost: '0' });
+  const [creatingQuickItem, setCreatingQuickItem] = useState(false);
 
   useEffect(() => {
     erpAuthAPI.me()
@@ -128,6 +156,23 @@ export default function StaffDashboard() {
   useEffect(() => { loadJobs(); }, [loadJobs]);
   useEffect(() => { if (activeView === 'tools') loadAssets(); }, [activeView, loadAssets]);
   useEffect(() => { if (activeView === 'history') loadHistory(); }, [activeView, loadHistory]);
+
+  const loadPurchaseOrders = useCallback(async () => {
+    setLoadingPOs(true);
+    try {
+      const data = await purchaseOrdersAPI.list({});
+      setPurchaseOrders(data.orders || data || []);
+    } catch { /* non-critical */ }
+    finally { setLoadingPOs(false); }
+  }, []);
+  const loadPOFormData = useCallback(async () => {
+    try {
+      const [itemsData, locsData] = await Promise.all([itemsAPI.list({}), locationsAPI.list({})]);
+      setPOItems((itemsData.items || itemsData || []).map((i: any) => ({ _id: i._id, name: i.name, sku: i.sku })));
+      setPOLocations((locsData.locations || locsData || []).map((l: any) => ({ _id: l._id, name: l.name })));
+    } catch { /* non-critical */ }
+  }, []);
+  useEffect(() => { if (activeView === 'orders') { loadPurchaseOrders(); loadPOFormData(); } }, [activeView, loadPurchaseOrders, loadPOFormData]);
 
   useEffect(() => {
     if (selectedJob?.tracking?.startedAt && !selectedJob?.tracking?.finishedAt) {
@@ -177,6 +222,9 @@ export default function StaffDashboard() {
     if (!selectedJob) return;
     setTrackingAction('checkin');
     try {
+      if (!navigator.geolocation) {
+        throw new Error('GPS not available on this device');
+      }
       const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 15000 });
       });
@@ -186,7 +234,16 @@ export default function StaffDashboard() {
       setSelectedJob(updated);
       loadJobs();
     } catch (err: any) {
-      toast({ title: 'Check-in failed', description: err.message, variant: 'destructive' });
+      let msg = err.message || 'Location access failed';
+      if (err instanceof GeolocationPositionError) {
+        if (err.code === 1) msg = 'Location permission denied. Please allow location access in your browser settings and try again.';
+        else if (err.code === 2) msg = 'Could not determine your location. Please check your GPS/network and try again.';
+        else if (err.code === 3) msg = 'Location request timed out. Please move to an area with better signal.';
+      }
+      if (msg.includes('permissions policy') || msg.includes('Permissions policy')) {
+        msg = 'Location blocked by site settings. Please contact admin or try opening in your default browser (not an in-app browser).';
+      }
+      toast({ title: 'Check-in failed', description: msg, variant: 'destructive' });
     } finally { setTrackingAction(null); }
   };
 
@@ -268,6 +325,52 @@ export default function StaffDashboard() {
   const handleAssetCheckin = async (id: string) => {
     try { await assetsAPI.checkin(id, { condition: 'good' }); toast({ title: 'Tool returned' }); loadAssets(); }
     catch (err: any) { toast({ title: 'Error', description: err.message, variant: 'destructive' }); }
+  };
+
+  const handleCreatePO = async () => {
+    if (!poForm.supplierName.trim()) { toast({ title: 'Supplier name required', variant: 'destructive' }); return; }
+    if (!poForm.deliverTo) { toast({ title: 'Select delivery location', variant: 'destructive' }); return; }
+    const validLines = poForm.lines.filter(l => l.itemId && parseFloat(l.quantity) > 0 && parseFloat(l.unitCost) >= 0);
+    if (validLines.length === 0) { toast({ title: 'Add at least one line item', variant: 'destructive' }); return; }
+    setCreatingPO(true);
+    try {
+      await purchaseOrdersAPI.create({
+        supplier: { name: poForm.supplierName, code: poForm.supplierCode },
+        deliverTo: poForm.deliverTo,
+        expectedDeliveryDate: poForm.expectedDeliveryDate || undefined,
+        notes: poForm.notes || undefined,
+        lines: validLines.map(l => ({ itemId: l.itemId, quantity: parseFloat(l.quantity), unitCost: parseFloat(l.unitCost) })),
+      });
+      toast({ title: 'Purchase order created!' });
+      setShowPOForm(false);
+      setPOForm({ supplierName: '', supplierCode: '', deliverTo: '', expectedDeliveryDate: '', notes: '', lines: [{ itemId: '', quantity: '', unitCost: '' }] });
+      loadPurchaseOrders();
+    } catch (err: any) {
+      toast({ title: 'Failed', description: err.message, variant: 'destructive' });
+    } finally { setCreatingPO(false); }
+  };
+
+  const handleSubmitPO = async (id: string) => {
+    try { await purchaseOrdersAPI.submit(id); toast({ title: 'PO submitted for approval' }); loadPurchaseOrders(); }
+    catch (err: any) { toast({ title: 'Error', description: err.message, variant: 'destructive' }); }
+  };
+
+  const handleCancelPO = async (id: string) => {
+    try { await purchaseOrdersAPI.cancel(id); toast({ title: 'PO cancelled' }); loadPurchaseOrders(); }
+    catch (err: any) { toast({ title: 'Error', description: err.message, variant: 'destructive' }); }
+  };
+
+  const handleQuickItemCreate = async () => {
+    setCreatingQuickItem(true);
+    try {
+      const payload = { ...quickItemForm, unitCost: parseFloat(quickItemForm.unitCost) || 0 };
+      await itemsAPI.create(payload);
+      toast({ title: `Item "${quickItemForm.name}" created` });
+      setShowQuickItemForm(false);
+      setQuickItemForm({ sku: '', name: '', itemType: 'Consumable', uom: 'Units', unitCost: '0' });
+      await loadPOFormData();
+    } catch (err: any) { toast({ title: 'Error', description: err.message, variant: 'destructive' }); }
+    finally { setCreatingQuickItem(false); }
   };
 
   const openJobDetail = (job: JobTicket) => {
@@ -567,6 +670,170 @@ export default function StaffDashboard() {
             </div>
           )}
 
+          {/* PURCHASE ORDERS VIEW */}
+          {activeView === 'orders' && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-bold text-slate-900">Purchase Orders</h2>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={loadPurchaseOrders} className="gap-1 rounded-xl"><RefreshCw size={14} /></Button>
+                  <Button size="sm" onClick={() => setShowPOForm(true)} className="gap-1 rounded-xl"><Plus size={14} /> New PO</Button>
+                </div>
+              </div>
+
+              {/* PO Create Form */}
+              {showPOForm && (
+                <Card className="border-0 shadow-sm p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="font-semibold text-sm text-slate-900">New Purchase Order</p>
+                    <button onClick={() => setShowPOForm(false)} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-xs text-slate-500 font-medium">Supplier Name *</label>
+                      <input className="w-full h-9 rounded-lg border border-slate-200 px-3 text-sm" value={poForm.supplierName} onChange={e => setPOForm(p => ({ ...p, supplierName: e.target.value }))} placeholder="e.g. Daikin Singapore" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-500 font-medium">Supplier Code</label>
+                      <input className="w-full h-9 rounded-lg border border-slate-200 px-3 text-sm" value={poForm.supplierCode} onChange={e => setPOForm(p => ({ ...p, supplierCode: e.target.value }))} />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-xs text-slate-500 font-medium">Deliver To *</label>
+                      <select className="w-full h-9 rounded-lg border border-slate-200 px-2 text-sm bg-white" value={poForm.deliverTo} onChange={e => setPOForm(p => ({ ...p, deliverTo: e.target.value }))}>
+                        <option value="">Select…</option>
+                        {poLocations.map(l => <option key={l._id} value={l._id}>{l.name}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-500 font-medium">Expected Delivery</label>
+                      <input type="date" className="w-full h-9 rounded-lg border border-slate-200 px-2 text-sm" value={poForm.expectedDeliveryDate} onChange={e => setPOForm(p => ({ ...p, expectedDeliveryDate: e.target.value }))} />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-slate-500 font-medium">Notes</label>
+                    <input className="w-full h-9 rounded-lg border border-slate-200 px-3 text-sm" value={poForm.notes} onChange={e => setPOForm(p => ({ ...p, notes: e.target.value }))} placeholder="Optional notes" />
+                  </div>
+
+                  {/* Line Items */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-xs text-slate-500 font-semibold">Line Items</label>
+                      <div className="flex gap-2">
+                        <button className="text-xs text-green-600 font-medium" onClick={() => setShowQuickItemForm(true)}>+ New Item</button>
+                        <button className="text-xs text-blue-600 font-medium" onClick={() => setPOForm(p => ({ ...p, lines: [...p.lines, { itemId: '', quantity: '', unitCost: '' }] }))}>+ Add Line</button>
+                      </div>
+                    </div>
+                    {poForm.lines.map((line, idx) => (
+                      <div key={idx} className="flex gap-1.5 items-end mb-2">
+                        <div className="flex-1">
+                          {idx === 0 && <label className="text-[10px] text-slate-400">Item</label>}
+                          <select className="w-full h-9 rounded-lg border border-slate-200 px-2 text-sm bg-white" value={line.itemId} onChange={e => { const lines = [...poForm.lines]; lines[idx] = { ...lines[idx], itemId: e.target.value }; setPOForm(p => ({ ...p, lines })); }}>
+                            <option value="">Select…</option>
+                            {poItems.map(it => <option key={it._id} value={it._id}>{it.name} ({it.sku})</option>)}
+                          </select>
+                        </div>
+                        <div className="w-16">
+                          {idx === 0 && <label className="text-[10px] text-slate-400">Qty</label>}
+                          <input type="number" min="1" className="w-full h-9 rounded-lg border border-slate-200 px-2 text-sm" value={line.quantity} onChange={e => { const lines = [...poForm.lines]; lines[idx] = { ...lines[idx], quantity: e.target.value }; setPOForm(p => ({ ...p, lines })); }} />
+                        </div>
+                        <div className="w-20">
+                          {idx === 0 && <label className="text-[10px] text-slate-400">Cost</label>}
+                          <input type="number" step="0.01" min="0" className="w-full h-9 rounded-lg border border-slate-200 px-2 text-sm" value={line.unitCost} onChange={e => { const lines = [...poForm.lines]; lines[idx] = { ...lines[idx], unitCost: e.target.value }; setPOForm(p => ({ ...p, lines })); }} />
+                        </div>
+                        <button className="h-9 w-8 flex items-center justify-center text-red-400 hover:text-red-600" onClick={() => { if (poForm.lines.length <= 1) return; setPOForm(p => ({ ...p, lines: p.lines.filter((_, i) => i !== idx) })); }}><Trash2 size={14} /></button>
+                      </div>
+                    ))}
+                  </div>
+
+                  <Button className="w-full rounded-xl gap-1.5" onClick={handleCreatePO} disabled={creatingPO}>
+                    {creatingPO ? <><Loader2 size={14} className="animate-spin" /> Creating…</> : <><ShoppingCart size={14} /> Create Purchase Order</>}
+                  </Button>
+                </Card>
+              )}
+
+              {/* Quick Item Create Form */}
+              {showQuickItemForm && (
+                <Card className="border-0 shadow-sm p-4 space-y-2 border-l-4 border-l-green-500">
+                  <div className="flex items-center justify-between">
+                    <p className="font-semibold text-sm text-green-700">Quick Add Item</p>
+                    <button onClick={() => setShowQuickItemForm(false)} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input className="w-full h-8 rounded-lg border border-slate-200 px-3 text-sm" placeholder="SKU *" value={quickItemForm.sku} onChange={e => setQuickItemForm(p => ({ ...p, sku: e.target.value }))} />
+                    <input className="w-full h-8 rounded-lg border border-slate-200 px-3 text-sm" placeholder="Name *" value={quickItemForm.name} onChange={e => setQuickItemForm(p => ({ ...p, name: e.target.value }))} />
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <input className="w-full h-8 rounded-lg border border-slate-200 px-3 text-sm" placeholder="UoM" value={quickItemForm.uom} onChange={e => setQuickItemForm(p => ({ ...p, uom: e.target.value }))} />
+                    <input type="number" step="0.01" className="w-full h-8 rounded-lg border border-slate-200 px-3 text-sm" placeholder="Cost" value={quickItemForm.unitCost} onChange={e => setQuickItemForm(p => ({ ...p, unitCost: e.target.value }))} />
+                    <select className="w-full h-8 rounded-lg border border-slate-200 px-2 text-sm bg-white" value={quickItemForm.itemType} onChange={e => setQuickItemForm(p => ({ ...p, itemType: e.target.value }))}>
+                      <option value="Consumable">Consumable</option>
+                      <option value="Asset">Asset</option>
+                    </select>
+                  </div>
+                  <Button size="sm" className="w-full rounded-xl gap-1 h-8" onClick={handleQuickItemCreate} disabled={creatingQuickItem || !quickItemForm.sku || !quickItemForm.name}>
+                    {creatingQuickItem ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />} Create Item
+                  </Button>
+                </Card>
+              )}
+
+              {/* PO List */}
+              {loadingPOs ? <PromachLoader variant="inline" /> : purchaseOrders.length === 0 && !showPOForm ? (
+                <Card className="border-0 shadow-sm"><CardContent className="p-8 text-center">
+                  <Package size={40} className="mx-auto text-slate-300 mb-3" />
+                  <p className="text-sm text-slate-500 mb-1">No purchase orders yet</p>
+                  <p className="text-xs text-slate-400">Create one to request materials from suppliers</p>
+                </CardContent></Card>
+              ) : purchaseOrders.map(po => (
+                <Card key={po._id} className="border-0 shadow-sm p-4 cursor-pointer active:bg-slate-50 transition-colors" onClick={() => setSelectedPO(po)}>
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="font-mono text-xs text-slate-500">{po.poNumber}</p>
+                        <Badge className={`border-0 text-[10px] ${
+                          po.status === 'Draft' ? 'bg-slate-100 text-slate-600' :
+                          po.status === 'Submitted' ? 'bg-blue-100 text-blue-700' :
+                          po.status === 'Approved' ? 'bg-green-100 text-green-700' :
+                          po.status === 'Partially_Received' ? 'bg-amber-100 text-amber-700' :
+                          po.status === 'Received' ? 'bg-emerald-100 text-emerald-700' :
+                          'bg-red-100 text-red-600'
+                        }`}>{po.status.replace(/_/g, ' ')}</Badge>
+                      </div>
+                      <p className="font-semibold text-sm text-slate-900 mt-0.5">{po.supplier.name}</p>
+                      {po.deliverTo && <p className="text-xs text-slate-500">→ {po.deliverTo.name}</p>}
+                    </div>
+                    <div className="text-right flex items-center gap-2">
+                      <div>
+                        <p className="font-bold text-sm text-slate-900">${po.totalAmount?.toFixed(2) || '0.00'}</p>
+                        <p className="text-[10px] text-slate-400">{po.lines.length} item(s)</p>
+                      </div>
+                      <ChevronRight size={14} className="text-slate-300" />
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100" onClick={e => e.stopPropagation()}>
+                    <p className="text-xs text-slate-400">{new Date(po.createdAt).toLocaleDateString('en-SG', { day: 'numeric', month: 'short' })}</p>
+                    <div className="flex gap-1.5">
+                      {po.status === 'Draft' && (
+                        <Button size="sm" variant="outline" className="gap-1 text-xs h-7 rounded-lg" onClick={() => handleSubmitPO(po._id)}>
+                          <Send size={12} /> Submit
+                        </Button>
+                      )}
+                      {!['Received', 'Cancelled'].includes(po.status) && (
+                        <Button size="sm" variant="ghost" className="gap-1 text-xs h-7 rounded-lg text-red-500 hover:text-red-700" onClick={() => handleCancelPO(po._id)}>
+                          <X size={12} /> Cancel
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+
           {/* PROFILE VIEW */}
           {activeView === 'profile' && (
             <div className="space-y-4">
@@ -604,12 +871,85 @@ export default function StaffDashboard() {
           )}
         </main>
 
+        {/* PO Detail Modal */}
+        {selectedPO && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setSelectedPO(null)}>
+            <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+              <div className="sticky top-0 bg-white p-4 border-b border-slate-100 flex items-center justify-between rounded-t-2xl z-10">
+                <div>
+                  <p className="font-mono text-xs text-slate-500">{selectedPO.poNumber}</p>
+                  <p className="font-bold text-slate-900">{selectedPO.supplier.name}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge className={`border-0 text-[10px] ${
+                    selectedPO.status === 'Draft' ? 'bg-slate-100 text-slate-600' :
+                    selectedPO.status === 'Submitted' ? 'bg-blue-100 text-blue-700' :
+                    selectedPO.status === 'Approved' ? 'bg-green-100 text-green-700' :
+                    selectedPO.status === 'Received' ? 'bg-emerald-100 text-emerald-700' :
+                    'bg-amber-100 text-amber-700'
+                  }`}>{selectedPO.status.replace(/_/g, ' ')}</Badge>
+                  <button onClick={() => setSelectedPO(null)} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center"><X size={16} /></button>
+                </div>
+              </div>
+              <div className="p-4 space-y-4">
+                {/* Info */}
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  {selectedPO.supplier.code && <div><span className="text-slate-500">Supplier Code:</span> <span className="font-medium">{selectedPO.supplier.code}</span></div>}
+                  {selectedPO.deliverTo && <div><span className="text-slate-500">Deliver To:</span> <span className="font-medium">{selectedPO.deliverTo.name}</span></div>}
+                  <div><span className="text-slate-500">Created:</span> <span className="font-medium">{new Date(selectedPO.createdAt).toLocaleDateString()}</span></div>
+                  <div><span className="text-slate-500">Total:</span> <span className="font-bold text-slate-900">${selectedPO.totalAmount?.toFixed(2)}</span></div>
+                </div>
+
+                {/* Lines */}
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase mb-2">Line Items</p>
+                  <div className="space-y-2">
+                    {selectedPO.lines.map((line, i) => (
+                      <div key={i} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm text-slate-900 truncate">{line.item?.name || 'Unknown Item'}</p>
+                          <p className="text-xs text-slate-500">{line.item?.sku || '—'} · ${line.unitCost.toFixed(2)} ea</p>
+                        </div>
+                        <div className="text-right ml-3">
+                          <p className="font-bold text-sm">${(line.quantity * line.unitCost).toFixed(2)}</p>
+                          <p className="text-xs text-slate-400">Qty: {line.quantity}{line.receivedQuantity > 0 ? ` (${line.receivedQuantity} rcvd)` : ''}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Total Card */}
+                <div className="flex items-center justify-between p-3 bg-primary/5 rounded-xl">
+                  <span className="text-sm font-medium text-slate-600">Total Amount</span>
+                  <span className="text-lg font-bold text-slate-900">${selectedPO.totalAmount?.toFixed(2)}</span>
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-2">
+                  {selectedPO.status === 'Draft' && (
+                    <Button size="sm" className="flex-1 rounded-xl gap-1" onClick={() => { handleSubmitPO(selectedPO._id); setSelectedPO(null); }}>
+                      <Send size={14} /> Submit
+                    </Button>
+                  )}
+                  {!['Received', 'Cancelled'].includes(selectedPO.status) && (
+                    <Button size="sm" variant="outline" className="flex-1 rounded-xl gap-1 text-red-500 border-red-200" onClick={() => { handleCancelPO(selectedPO._id); setSelectedPO(null); }}>
+                      <X size={14} /> Cancel PO
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Bottom Navigation */}
         <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-50 safe-area-bottom">
           <div className="max-w-lg mx-auto flex">
             {[
               { id: 'home' as const, icon: HardHat, label: 'Home' },
               { id: 'jobs' as const, icon: Briefcase, label: 'Jobs' },
+              { id: 'orders' as const, icon: ShoppingCart, label: 'Orders' },
               { id: 'history' as const, icon: History, label: 'History' },
               { id: 'tools' as const, icon: Wrench, label: 'Tools' },
               { id: 'profile' as const, icon: User, label: 'Profile' },

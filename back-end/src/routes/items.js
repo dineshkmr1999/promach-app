@@ -1,10 +1,113 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
+const XLSX = require('xlsx');
 const MasterItem = require('../models/MasterItem');
 const { verifyERPToken, requireRole } = require('../middleware/erpAuth');
 
+// File upload for Excel import (5MB limit, xlsx/xls only)
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 5 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+        const allowed = ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-excel'];
+        if (allowed.includes(file.mimetype)) cb(null, true);
+        else cb(new Error('Only .xlsx and .xls files are allowed'));
+    }
+});
+
 // All routes require ERP auth
 router.use(verifyERPToken);
+
+// ─── GET /sample-template  (download sample Excel) ───
+router.get('/sample-template', (req, res) => {
+    const sampleData = [
+        { sku: 'GAS-R32-10', name: 'Refrigerant Gas R32 10kg', description: 'R32 refrigerant gas cylinder', itemType: 'Consumable', category: 'Gas', uom: 'Cylinder', unitCost: 85, sellingPrice: 150, reorderLevel: 5, brand: 'Daikin', barcode: '8901234567890', minStockLevel: 3, maxStockLevel: 50, supplierName: 'Daikin SG', supplierCode: 'SUP-001' },
+        { sku: 'TOOL-VP-001', name: 'Vacuum Pump VP-100', description: 'Professional vacuum pump for aircon servicing', itemType: 'Asset', category: 'Tools', uom: 'Units', unitCost: 450, sellingPrice: 0, reorderLevel: 0, brand: 'Yellow Jacket', barcode: '', minStockLevel: 0, maxStockLevel: 0, supplierName: '', supplierCode: '' },
+        { sku: 'COP-PIPE-6M', name: 'Copper Pipe 1/4" 6M', description: '1/4 inch copper pipe, 6 meter length', itemType: 'Consumable', category: 'Pipes', uom: 'Meters', unitCost: 12.5, sellingPrice: 25, reorderLevel: 20, brand: '', barcode: '', minStockLevel: 10, maxStockLevel: 100, supplierName: 'Metal Supply Co', supplierCode: 'SUP-002' },
+    ];
+    const ws = XLSX.utils.json_to_sheet(sampleData);
+    // Set column widths
+    ws['!cols'] = [
+        { wch: 14 }, { wch: 28 }, { wch: 40 }, { wch: 12 }, { wch: 10 }, { wch: 10 },
+        { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 16 },
+        { wch: 12 }, { wch: 12 }, { wch: 15 }, { wch: 12 }
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Items');
+    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename=promach-items-template.xlsx');
+    res.send(buf);
+});
+
+// ─── POST /import  (Admin & Ops Manager — bulk import from Excel) ───
+router.post('/import', requireRole('Admin', 'Operations_Manager'), upload.single('file'), async (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
+
+        const wb = XLSX.read(req.file.buffer, { type: 'buffer' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        if (!ws) return res.status(400).json({ message: 'Empty spreadsheet' });
+
+        const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+        if (rows.length === 0) return res.status(400).json({ message: 'No data rows found' });
+        if (rows.length > 500) return res.status(400).json({ message: 'Maximum 500 rows per import' });
+
+        const validTypes = ['Consumable', 'Asset', 'Kit'];
+        const results = { created: 0, skipped: 0, errors: [] };
+
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            const rowNum = i + 2; // Excel row (header = 1)
+            try {
+                const sku = String(row.sku || '').trim().toUpperCase();
+                const name = String(row.name || '').trim();
+                const itemType = String(row.itemType || 'Consumable').trim();
+
+                if (!sku) { results.errors.push(`Row ${rowNum}: SKU is required`); results.skipped++; continue; }
+                if (!name) { results.errors.push(`Row ${rowNum}: Name is required`); results.skipped++; continue; }
+                if (!validTypes.includes(itemType)) { results.errors.push(`Row ${rowNum}: Invalid type "${itemType}" (use Consumable, Asset, or Kit)`); results.skipped++; continue; }
+
+                // Check for duplicate SKU
+                const existing = await MasterItem.findOne({ sku });
+                if (existing) { results.errors.push(`Row ${rowNum}: SKU "${sku}" already exists`); results.skipped++; continue; }
+
+                await MasterItem.create({
+                    sku,
+                    name,
+                    description: String(row.description || '').trim(),
+                    itemType,
+                    category: String(row.category || '').trim(),
+                    uom: String(row.uom || 'Units').trim(),
+                    unitCost: parseFloat(row.unitCost) || 0,
+                    sellingPrice: parseFloat(row.sellingPrice) || 0,
+                    reorderLevel: parseFloat(row.reorderLevel) || 0,
+                    brand: String(row.brand || '').trim(),
+                    barcode: String(row.barcode || '').trim() || undefined,
+                    minStockLevel: parseFloat(row.minStockLevel) || 0,
+                    maxStockLevel: parseFloat(row.maxStockLevel) || 0,
+                    supplier: {
+                        name: String(row.supplierName || '').trim(),
+                        code: String(row.supplierCode || '').trim(),
+                    }
+                });
+                results.created++;
+            } catch (err) {
+                results.errors.push(`Row ${rowNum}: ${err.message}`);
+                results.skipped++;
+            }
+        }
+
+        res.json({
+            message: `Import complete: ${results.created} created, ${results.skipped} skipped`,
+            ...results
+        });
+    } catch (error) {
+        console.error('Import items error:', error.message);
+        res.status(500).json({ message: 'Import failed: ' + error.message });
+    }
+});
 
 // ─── GET /  (list all items, with optional filters) ───
 router.get('/', async (req, res) => {

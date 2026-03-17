@@ -23,7 +23,7 @@ const inventoryTxnSchema = new mongoose.Schema({
     location: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Location',
-        required: true
+        default: null
     },
     quantity: {
         type: mongoose.Types.Decimal128,

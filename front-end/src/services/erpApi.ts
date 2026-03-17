@@ -97,6 +97,30 @@ export const itemsAPI = {
     erpFetch(`/items/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   remove: (id: string) =>
     erpFetch(`/items/${id}`, { method: 'DELETE' }),
+  downloadTemplate: () => {
+    const token = localStorage.getItem('erpToken') || localStorage.getItem('adminToken');
+    return fetch(`${API_URL}/erp/items/sample-template`, {
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    }).then(res => {
+      if (!res.ok) throw new Error('Download failed');
+      return res.blob();
+    });
+  },
+  importExcel: async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const token = localStorage.getItem('erpToken') || localStorage.getItem('adminToken');
+    const res = await fetch(`${API_URL}/erp/items/import`, {
+      method: 'POST',
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: formData,
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ message: 'Import failed' }));
+      throw new Error(body.message || 'Import failed');
+    }
+    return res.json();
+  },
 };
 
 // ── Locations ──

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,7 +15,8 @@ import {
     Package, MapPin, ArrowLeftRight, Briefcase, Wrench, Plus, Search, RefreshCw,
     Warehouse, Truck, Building2, AlertTriangle, TrendingDown, CheckCircle2, Clock,
     ChevronRight, Send, Download, Eye, Trash2, Edit, Users, ShoppingCart,
-    FileText, BarChart3, ClipboardCheck, DollarSign, Loader2
+    FileText, BarChart3, ClipboardCheck, DollarSign, Loader2, Upload, FileSpreadsheet,
+    X, ChevronDown, ChevronUp, Hash, Calendar, TrendingUp, Activity
 } from 'lucide-react';
 import { itemsAPI, locationsAPI, inventoryAPI, jobTicketsAPI, assetsAPI, erpAuthAPI, purchaseOrdersAPI } from '@/services/erpApi';
 import { useToast } from '@/hooks/use-toast';
@@ -25,10 +26,14 @@ interface MasterItem {
     _id: string; sku: string; name: string; description?: string;
     itemType: 'Consumable' | 'Asset' | 'Kit'; category?: string; uom: string;
     unitCost: number; sellingPrice: number; reorderLevel: number;
+    minStockLevel?: number; maxStockLevel?: number;
     assetTag?: string; assetStatus?: string; brand?: string; isActive: boolean;
+    barcode?: string; trackBatch?: boolean; trackExpiry?: boolean;
+    supplier?: { name?: string; code?: string; leadTimeDays?: number; lastPurchasePrice?: number };
     currentHolder?: { _id: string; name: string };
     currentLocation?: { _id: string; name: string; locationType: string };
     kitComponents?: { item: { _id: string; name: string; sku: string; uom: string }; quantity: number }[];
+    createdAt?: string; updatedAt?: string;
 }
 interface Location {
     _id: string; name: string; locationType: 'Warehouse' | 'Van' | 'Site';
@@ -153,6 +158,21 @@ export default function InventoryManagement() {
     const [valuation, setValuation] = useState<ValuationRow[]>([]);
     const [valuationTotal, setValuationTotal] = useState(0);
     const [loadingReport, setLoadingReport] = useState(false);
+
+    // ── Excel Import ──
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [importing, setImporting] = useState(false);
+
+    // ── PO Detail View ──
+    const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
+
+    // ── Quick Item Create (inline in PO form) ──
+    const [showQuickItemDialog, setShowQuickItemDialog] = useState(false);
+    const [quickItemForm, setQuickItemForm] = useState({ sku: '', name: '', itemType: 'Consumable', uom: 'Units', unitCost: '0', category: '' });
+    const [creatingQuickItem, setCreatingQuickItem] = useState(false);
+
+    // ── Item Detail View ──
+    const [selectedItem, setSelectedItem] = useState<MasterItem | null>(null);
 
     // ── Data loaders ──
     const loadItems = useCallback(async () => {
@@ -356,6 +376,44 @@ export default function InventoryManagement() {
         catch (err: any) { toast({ title: 'Error', description: err.message, variant: 'destructive' }); }
     };
 
+    // ── Excel import/export handlers ──
+    const handleDownloadTemplate = async () => {
+        try {
+            const blob = await itemsAPI.downloadTemplate();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = 'promach-items-template.xlsx'; a.click();
+            URL.revokeObjectURL(url);
+            toast({ title: 'Template downloaded' });
+        } catch (err: any) { toast({ title: 'Error', description: err.message, variant: 'destructive' }); }
+    };
+    const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setImporting(true);
+        try {
+            const result = await itemsAPI.importExcel(file);
+            toast({ title: 'Import Complete', description: `${result.created} items created, ${result.skipped} skipped` });
+            if (result.errors?.length > 0) {
+                console.warn('Import errors:', result.errors);
+            }
+            loadItems();
+        } catch (err: any) { toast({ title: 'Import Error', description: err.message, variant: 'destructive' }); }
+        finally { setImporting(false); if (fileInputRef.current) fileInputRef.current.value = ''; }
+    };
+
+    // ── Quick Item create (from PO form) ──
+    const handleQuickItemCreate = async () => {
+        setCreatingQuickItem(true);
+        try {
+            const payload = { ...quickItemForm, unitCost: parseFloat(quickItemForm.unitCost) || 0 };
+            const created = await itemsAPI.create(payload);
+            toast({ title: `Item "${created.name}" created` });
+            setShowQuickItemDialog(false);
+            await loadItems(); // Refresh items list so it appears in dropdowns
+        } catch (err: any) { toast({ title: 'Error', description: err.message, variant: 'destructive' }); }
+        finally { setCreatingQuickItem(false); }
+    };
+
     const locationIcon = (type: string) => {
         if (type === 'Warehouse') return <Warehouse size={16} className="text-blue-600" />;
         if (type === 'Van') return <Truck size={16} className="text-amber-600" />;
@@ -439,6 +497,24 @@ export default function InventoryManagement() {
                             <Button onClick={openNewItem} className="gap-1.5"><Plus size={16} /> Add Item</Button>
                         </div>
 
+                        {/* Excel Import/Export Bar */}
+                        <Card className="border-0 shadow-sm">
+                            <CardContent className="p-3 flex flex-wrap items-center gap-3">
+                                <div className="flex items-center gap-2 text-sm text-slate-600">
+                                    <FileSpreadsheet size={16} className="text-green-600" />
+                                    <span className="font-medium">Bulk Operations:</span>
+                                </div>
+                                <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={handleDownloadTemplate}>
+                                    <Download size={14} /> Download Template
+                                </Button>
+                                <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleImportExcel} className="hidden" />
+                                <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={() => fileInputRef.current?.click()} disabled={importing}>
+                                    {importing ? <><Loader2 size={14} className="animate-spin" /> Importing…</> : <><Upload size={14} /> Import Excel</>}
+                                </Button>
+                                <span className="text-[11px] text-slate-400 ml-auto">Max 500 rows · .xlsx format</span>
+                            </CardContent>
+                        </Card>
+
                         <Card className="border-0 shadow-sm overflow-hidden">
                             {isLoading ? <div className="p-8"><PromachLoader variant="inline" /></div> : (
                                 <Table>
@@ -447,6 +523,7 @@ export default function InventoryManagement() {
                                             <TableHead className="font-semibold">SKU</TableHead>
                                             <TableHead className="font-semibold">Name</TableHead>
                                             <TableHead className="font-semibold">Type</TableHead>
+                                            <TableHead className="font-semibold">Category</TableHead>
                                             <TableHead className="font-semibold">UoM</TableHead>
                                             <TableHead className="font-semibold text-right">Cost (SGD)</TableHead>
                                             <TableHead className="font-semibold text-right">Sell (SGD)</TableHead>
@@ -455,17 +532,19 @@ export default function InventoryManagement() {
                                     </TableHeader>
                                     <TableBody>
                                         {items.length === 0 ? (
-                                            <TableRow><TableCell colSpan={7} className="text-center text-slate-400 py-10">No items found. Click &quot;Add Item&quot; to create one.</TableCell></TableRow>
+                                            <TableRow><TableCell colSpan={8} className="text-center text-slate-400 py-10">No items found. Click &quot;Add Item&quot; to create one.</TableCell></TableRow>
                                         ) : items.map(item => (
-                                            <TableRow key={item._id} className="hover:bg-slate-50">
+                                            <TableRow key={item._id} className="hover:bg-slate-50 cursor-pointer" onClick={() => setSelectedItem(item)}>
                                                 <TableCell className="font-mono text-xs">{item.sku}</TableCell>
                                                 <TableCell className="font-medium">{item.name}</TableCell>
                                                 <TableCell>{statusBadge(item.itemType)}</TableCell>
+                                                <TableCell className="text-slate-500 text-sm">{item.category || '—'}</TableCell>
                                                 <TableCell className="text-slate-600">{item.uom}</TableCell>
                                                 <TableCell className="text-right font-mono">{item.unitCost.toFixed(2)}</TableCell>
                                                 <TableCell className="text-right font-mono">{item.sellingPrice.toFixed(2)}</TableCell>
                                                 <TableCell className="text-center">
-                                                    <div className="flex justify-center gap-1">
+                                                    <div className="flex justify-center gap-1" onClick={e => e.stopPropagation()}>
+                                                        <Button size="sm" variant="ghost" onClick={() => setSelectedItem(item)}><Eye size={14} /></Button>
                                                         <Button size="sm" variant="ghost" onClick={() => openEditItem(item)}><Edit size={14} /></Button>
                                                         <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-700" onClick={() => handleDeleteItem(item._id)}><Trash2 size={14} /></Button>
                                                     </div>
@@ -746,7 +825,7 @@ export default function InventoryManagement() {
                                     {purchaseOrders.length === 0 ? (
                                         <TableRow><TableCell colSpan={8} className="text-center text-slate-400 py-10">No purchase orders yet</TableCell></TableRow>
                                     ) : purchaseOrders.map(po => (
-                                        <TableRow key={po._id} className="hover:bg-slate-50">
+                                        <TableRow key={po._id} className="hover:bg-slate-50 cursor-pointer" onClick={() => setSelectedPO(po)}>
                                             <TableCell className="font-mono text-sm font-medium">{po.poNumber}</TableCell>
                                             <TableCell>
                                                 <p className="font-medium text-sm">{po.supplier.name}</p>
@@ -757,8 +836,9 @@ export default function InventoryManagement() {
                                             <TableCell className="text-right font-mono font-bold">${po.totalAmount.toFixed(2)}</TableCell>
                                             <TableCell>{statusBadge(po.status)}</TableCell>
                                             <TableCell className="text-sm text-slate-500">{new Date(po.createdAt).toLocaleDateString()}</TableCell>
-                                            <TableCell className="text-center">
+                                            <TableCell className="text-center" onClick={e => e.stopPropagation()}>
                                                 <div className="flex justify-center gap-1.5 flex-wrap">
+                                                    <Button size="sm" variant="ghost" onClick={() => setSelectedPO(po)}><Eye size={14} /></Button>
                                                     {po.status === 'Submitted' && (
                                                         <Button size="sm" className="gap-1 text-xs" onClick={() => handleApprovePO(po._id)}><CheckCircle2 size={12} /> Approve</Button>
                                                     )}
@@ -781,23 +861,96 @@ export default function InventoryManagement() {
                     <TabsContent value="reports" className="space-y-4">
                         <div className="flex justify-between items-center">
                             <div>
-                                <h3 className="text-lg font-bold text-slate-900">Stock Valuation Report</h3>
-                                <p className="text-sm text-slate-500">Total inventory value across all locations</p>
+                                <h3 className="text-lg font-bold text-slate-900">Inventory Reports</h3>
+                                <p className="text-sm text-slate-500">Valuation, low stock alerts, and inventory insights</p>
                             </div>
                             <Button variant="outline" onClick={loadValuation} className="gap-1.5"><RefreshCw size={14} /> Refresh</Button>
                         </div>
 
-                        <Card className="border-0 shadow-sm p-4">
-                            <div className="flex items-center gap-3">
-                                <div className="w-12 h-12 bg-green-50 rounded-xl flex items-center justify-center"><DollarSign size={24} className="text-green-600" /></div>
-                                <div>
-                                    <p className="text-3xl font-bold text-slate-900">${valuationTotal.toFixed(2)}</p>
-                                    <p className="text-sm text-slate-500">Total Inventory Value (SGD)</p>
-                                </div>
-                            </div>
-                        </Card>
+                        {/* Summary Cards */}
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                            <Card className="border-0 shadow-sm">
+                                <CardContent className="p-4 flex items-center gap-3">
+                                    <div className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center"><DollarSign size={20} className="text-green-600" /></div>
+                                    <div>
+                                        <p className="text-xl font-bold text-slate-900">${valuationTotal.toFixed(2)}</p>
+                                        <p className="text-xs text-slate-500">Total Value (SGD)</p>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                            <Card className="border-0 shadow-sm">
+                                <CardContent className="p-4 flex items-center gap-3">
+                                    <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center"><Package size={20} className="text-blue-600" /></div>
+                                    <div>
+                                        <p className="text-xl font-bold text-slate-900">{valuation.length}</p>
+                                        <p className="text-xs text-slate-500">Stock Lines</p>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                            <Card className="border-0 shadow-sm">
+                                <CardContent className="p-4 flex items-center gap-3">
+                                    <div className={`w-10 h-10 ${lowStock.length > 0 ? 'bg-red-50' : 'bg-slate-50'} rounded-xl flex items-center justify-center`}>
+                                        <AlertTriangle size={20} className={lowStock.length > 0 ? 'text-red-600' : 'text-slate-400'} />
+                                    </div>
+                                    <div>
+                                        <p className="text-xl font-bold text-slate-900">{lowStock.length}</p>
+                                        <p className="text-xs text-slate-500">Low Stock Items</p>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                            <Card className="border-0 shadow-sm">
+                                <CardContent className="p-4 flex items-center gap-3">
+                                    <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center"><Activity size={20} className="text-purple-600" /></div>
+                                    <div>
+                                        <p className="text-xl font-bold text-slate-900">{new Set(valuation.map(v => v.location)).size}</p>
+                                        <p className="text-xs text-slate-500">Active Locations</p>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </div>
 
+                        {/* Low Stock Alert Section */}
+                        {lowStock.length > 0 && (
+                            <Card className="border-0 shadow-sm border-l-4 border-l-red-500">
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="text-base flex items-center gap-2 text-red-700">
+                                        <AlertTriangle size={18} /> Low Stock Alert — {lowStock.length} item(s) below reorder level
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow className="bg-red-50/50">
+                                                <TableHead className="font-semibold text-xs">Item</TableHead>
+                                                <TableHead className="font-semibold text-xs">SKU</TableHead>
+                                                <TableHead className="font-semibold text-xs">Location</TableHead>
+                                                <TableHead className="font-semibold text-xs text-right">On Hand</TableHead>
+                                                <TableHead className="font-semibold text-xs text-right">Reorder Lvl</TableHead>
+                                                <TableHead className="font-semibold text-xs text-right">Shortfall</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {lowStock.map((ls, i) => (
+                                                <TableRow key={i} className="bg-red-50/30">
+                                                    <TableCell className="font-medium text-sm">{ls.item}</TableCell>
+                                                    <TableCell className="font-mono text-xs">{ls.sku}</TableCell>
+                                                    <TableCell className="text-sm">{ls.location}</TableCell>
+                                                    <TableCell className="text-right font-mono font-bold text-red-600">{ls.quantityOnHand}</TableCell>
+                                                    <TableCell className="text-right font-mono">{ls.reorderLevel}</TableCell>
+                                                    <TableCell className="text-right font-mono font-bold text-red-700">{ls.reorderLevel - ls.quantityOnHand}</TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </CardContent>
+                            </Card>
+                        )}
+
+                        {/* Valuation Table */}
                         <Card className="border-0 shadow-sm overflow-hidden">
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-base">Stock Valuation</CardTitle>
+                            </CardHeader>
                             {loadingReport ? <div className="p-8"><PromachLoader variant="inline" /></div> : (
                                 <Table>
                                     <TableHeader>
@@ -825,6 +978,12 @@ export default function InventoryManagement() {
                                                 <TableCell className="text-right font-mono font-bold">${row.totalValue.toFixed(2)}</TableCell>
                                             </TableRow>
                                         ))}
+                                        {valuation.length > 0 && (
+                                            <TableRow className="bg-slate-100 font-bold">
+                                                <TableCell colSpan={6} className="text-right">Grand Total</TableCell>
+                                                <TableCell className="text-right font-mono text-lg">${valuationTotal.toFixed(2)}</TableCell>
+                                            </TableRow>
+                                        )}
                                     </TableBody>
                                 </Table>
                             )}
@@ -1168,7 +1327,12 @@ export default function InventoryManagement() {
                         <div>
                             <div className="flex justify-between items-center mb-2">
                                 <Label className="text-sm font-semibold">Line Items</Label>
-                                <Button size="sm" variant="outline" onClick={() => setPOForm(p => ({ ...p, lines: [...p.lines, { itemId: '', quantity: '', unitCost: '' }] }))}><Plus size={14} className="mr-1" /> Add Line</Button>
+                                <div className="flex gap-2">
+                                    <Button size="sm" variant="ghost" className="text-xs gap-1 text-green-600 hover:text-green-700" onClick={() => { setQuickItemForm({ sku: '', name: '', itemType: 'Consumable', uom: 'Units', unitCost: '0', category: '' }); setShowQuickItemDialog(true); }}>
+                                        <Plus size={12} /> Quick Add Item
+                                    </Button>
+                                    <Button size="sm" variant="outline" onClick={() => setPOForm(p => ({ ...p, lines: [...p.lines, { itemId: '', quantity: '', unitCost: '' }] }))}><Plus size={14} className="mr-1" /> Add Line</Button>
+                                </div>
                             </div>
                             {poForm.lines.map((line: any, idx: number) => (
                                 <div key={idx} className="grid grid-cols-[1fr_80px_100px_32px] gap-2 items-end mb-2">
@@ -1196,6 +1360,253 @@ export default function InventoryManagement() {
                         <Button variant="outline" onClick={() => setShowPODialog(false)}>Cancel</Button>
                         <Button onClick={handleCreatePO}>Create PO</Button>
                     </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* ═══════════════════ PO DETAIL DIALOG ═══════════════════ */}
+            <Dialog open={!!selectedPO} onOpenChange={() => setSelectedPO(null)}>
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                    {selectedPO && (
+                        <>
+                            <DialogHeader>
+                                <DialogTitle className="flex items-center gap-3">
+                                    <span>Purchase Order {selectedPO.poNumber}</span>
+                                    {statusBadge(selectedPO.status)}
+                                </DialogTitle>
+                            </DialogHeader>
+                            <div className="space-y-4">
+                                {/* PO Header Info */}
+                                <div className="grid grid-cols-2 gap-4">
+                                    <Card className="border shadow-none">
+                                        <CardContent className="p-3 space-y-1">
+                                            <p className="text-xs font-medium text-slate-500 uppercase">Supplier</p>
+                                            <p className="font-semibold text-slate-900">{selectedPO.supplier.name}</p>
+                                            {selectedPO.supplier.code && <p className="text-xs text-slate-500">Code: {selectedPO.supplier.code}</p>}
+                                            {selectedPO.supplier.contactPerson && <p className="text-xs text-slate-500">Contact: {selectedPO.supplier.contactPerson}</p>}
+                                            {selectedPO.supplier.phone && <p className="text-xs text-slate-500">📞 {selectedPO.supplier.phone}</p>}
+                                            {selectedPO.supplier.email && <p className="text-xs text-slate-500">✉ {selectedPO.supplier.email}</p>}
+                                        </CardContent>
+                                    </Card>
+                                    <Card className="border shadow-none">
+                                        <CardContent className="p-3 space-y-1">
+                                            <p className="text-xs font-medium text-slate-500 uppercase">Delivery</p>
+                                            {selectedPO.deliverTo && (
+                                                <div className="flex items-center gap-1.5">
+                                                    {locationIcon(selectedPO.deliverTo.locationType)}
+                                                    <span className="font-semibold text-slate-900">{selectedPO.deliverTo.name}</span>
+                                                </div>
+                                            )}
+                                            {selectedPO.expectedDeliveryDate && (
+                                                <p className="text-xs text-slate-500 flex items-center gap-1"><Calendar size={12} /> Expected: {new Date(selectedPO.expectedDeliveryDate).toLocaleDateString()}</p>
+                                            )}
+                                            <p className="text-xs text-slate-500">Created: {new Date(selectedPO.createdAt).toLocaleDateString()}</p>
+                                            {selectedPO.createdBy && <p className="text-xs text-slate-500">By: {selectedPO.createdBy.name}</p>}
+                                            {selectedPO.approvedBy && <p className="text-xs text-slate-500">Approved by: {selectedPO.approvedBy.name}</p>}
+                                        </CardContent>
+                                    </Card>
+                                </div>
+
+                                {/* Line Items Detail */}
+                                <div>
+                                    <p className="text-sm font-semibold text-slate-700 mb-2">Line Items ({selectedPO.lines.length})</p>
+                                    <Card className="border shadow-none overflow-hidden">
+                                        <Table>
+                                            <TableHeader>
+                                                <TableRow className="bg-slate-50">
+                                                    <TableHead className="font-semibold text-xs">Item</TableHead>
+                                                    <TableHead className="font-semibold text-xs">SKU</TableHead>
+                                                    <TableHead className="font-semibold text-xs text-right">Qty</TableHead>
+                                                    <TableHead className="font-semibold text-xs">UoM</TableHead>
+                                                    <TableHead className="font-semibold text-xs text-right">Unit Cost</TableHead>
+                                                    <TableHead className="font-semibold text-xs text-right">Line Total</TableHead>
+                                                    <TableHead className="font-semibold text-xs text-right">Received</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {selectedPO.lines.map((line, i) => (
+                                                    <TableRow key={i}>
+                                                        <TableCell className="font-medium text-sm">{line.item?.name || 'Unknown'}</TableCell>
+                                                        <TableCell className="font-mono text-xs">{line.item?.sku || '—'}</TableCell>
+                                                        <TableCell className="text-right font-mono">{line.quantity}</TableCell>
+                                                        <TableCell className="text-xs text-slate-500">{line.item?.uom || '—'}</TableCell>
+                                                        <TableCell className="text-right font-mono">${line.unitCost.toFixed(2)}</TableCell>
+                                                        <TableCell className="text-right font-mono font-bold">${(line.quantity * line.unitCost).toFixed(2)}</TableCell>
+                                                        <TableCell className="text-right">
+                                                            <span className={`font-mono ${line.receivedQuantity >= line.quantity ? 'text-green-600' : line.receivedQuantity > 0 ? 'text-amber-600' : 'text-slate-400'}`}>
+                                                                {line.receivedQuantity}/{line.quantity}
+                                                            </span>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </Card>
+                                </div>
+
+                                {/* Total + Notes */}
+                                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                                    <span className="text-sm font-medium text-slate-600">Total Amount</span>
+                                    <span className="text-xl font-bold text-slate-900">${selectedPO.totalAmount.toFixed(2)}</span>
+                                </div>
+                                {selectedPO.notes && (
+                                    <div className="p-3 bg-amber-50 rounded-lg">
+                                        <p className="text-xs font-medium text-amber-700 mb-1">Notes</p>
+                                        <p className="text-sm text-amber-900">{selectedPO.notes}</p>
+                                    </div>
+                                )}
+                                {selectedPO.relatedJobTicket && (
+                                    <p className="text-xs text-slate-500">Related Job: <span className="font-mono">{selectedPO.relatedJobTicket.ticketNumber}</span></p>
+                                )}
+                            </div>
+                            <DialogFooter className="flex-wrap gap-2">
+                                {selectedPO.status === 'Submitted' && (
+                                    <Button className="gap-1" onClick={() => { handleApprovePO(selectedPO._id); setSelectedPO(null); }}><CheckCircle2 size={14} /> Approve</Button>
+                                )}
+                                {['Approved', 'Partially_Received'].includes(selectedPO.status) && (
+                                    <Button variant="outline" className="gap-1" onClick={() => { handleReceivePO(selectedPO); setSelectedPO(null); }}><Download size={14} /> Receive All</Button>
+                                )}
+                                {!['Received', 'Cancelled'].includes(selectedPO.status) && (
+                                    <Button variant="ghost" className="gap-1 text-red-500 hover:text-red-700" onClick={() => { handleCancelPO(selectedPO._id); setSelectedPO(null); }}><Trash2 size={14} /> Cancel PO</Button>
+                                )}
+                                <Button variant="outline" onClick={() => setSelectedPO(null)}>Close</Button>
+                            </DialogFooter>
+                        </>
+                    )}
+                </DialogContent>
+            </Dialog>
+
+            {/* ═══════════════════ QUICK ITEM CREATE DIALOG ═══════════════════ */}
+            <Dialog open={showQuickItemDialog} onOpenChange={setShowQuickItemDialog}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2"><Plus size={18} /> Quick Add Item</DialogTitle>
+                    </DialogHeader>
+                    <p className="text-xs text-slate-500 -mt-2">Create a new item that will be immediately available in dropdowns</p>
+                    <div className="grid gap-3 py-2">
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <Label className="text-xs">SKU *</Label>
+                                <Input value={quickItemForm.sku} onChange={e => setQuickItemForm(p => ({ ...p, sku: e.target.value }))} placeholder="e.g. PART-001" />
+                            </div>
+                            <div>
+                                <Label className="text-xs">Type</Label>
+                                <Select value={quickItemForm.itemType} onValueChange={v => setQuickItemForm(p => ({ ...p, itemType: v }))}>
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="Consumable">Consumable</SelectItem>
+                                        <SelectItem value="Asset">Asset</SelectItem>
+                                        <SelectItem value="Kit">Kit</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+                        <div>
+                            <Label className="text-xs">Name *</Label>
+                            <Input value={quickItemForm.name} onChange={e => setQuickItemForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. Copper Pipe 1/4 inch" />
+                        </div>
+                        <div className="grid grid-cols-3 gap-3">
+                            <div>
+                                <Label className="text-xs">UoM</Label>
+                                <Input value={quickItemForm.uom} onChange={e => setQuickItemForm(p => ({ ...p, uom: e.target.value }))} />
+                            </div>
+                            <div>
+                                <Label className="text-xs">Unit Cost</Label>
+                                <Input type="number" step="0.01" value={quickItemForm.unitCost} onChange={e => setQuickItemForm(p => ({ ...p, unitCost: e.target.value }))} />
+                            </div>
+                            <div>
+                                <Label className="text-xs">Category</Label>
+                                <Input value={quickItemForm.category} onChange={e => setQuickItemForm(p => ({ ...p, category: e.target.value }))} />
+                            </div>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowQuickItemDialog(false)}>Cancel</Button>
+                        <Button onClick={handleQuickItemCreate} disabled={creatingQuickItem || !quickItemForm.sku || !quickItemForm.name}>
+                            {creatingQuickItem ? <><Loader2 size={14} className="animate-spin mr-1" /> Creating…</> : 'Create Item'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* ═══════════════════ ITEM DETAIL DIALOG ═══════════════════ */}
+            <Dialog open={!!selectedItem} onOpenChange={() => setSelectedItem(null)}>
+                <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+                    {selectedItem && (
+                        <>
+                            <DialogHeader>
+                                <DialogTitle className="flex items-center gap-3">
+                                    <span>{selectedItem.name}</span>
+                                    {statusBadge(selectedItem.itemType)}
+                                </DialogTitle>
+                            </DialogHeader>
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="p-3 bg-slate-50 rounded-lg">
+                                        <p className="text-xs text-slate-500">SKU</p>
+                                        <p className="font-mono font-bold text-slate-900">{selectedItem.sku}</p>
+                                    </div>
+                                    <div className="p-3 bg-slate-50 rounded-lg">
+                                        <p className="text-xs text-slate-500">Status</p>
+                                        <p className="font-medium text-slate-900">{selectedItem.isActive ? '✅ Active' : '❌ Inactive'}</p>
+                                    </div>
+                                </div>
+                                {selectedItem.description && (
+                                    <div className="p-3 bg-slate-50 rounded-lg">
+                                        <p className="text-xs text-slate-500 mb-1">Description</p>
+                                        <p className="text-sm text-slate-700">{selectedItem.description}</p>
+                                    </div>
+                                )}
+                                <div className="grid grid-cols-3 gap-3">
+                                    <div className="p-3 bg-blue-50 rounded-lg text-center">
+                                        <p className="text-xs text-blue-600">Unit Cost</p>
+                                        <p className="font-bold text-blue-900">${selectedItem.unitCost.toFixed(2)}</p>
+                                    </div>
+                                    <div className="p-3 bg-green-50 rounded-lg text-center">
+                                        <p className="text-xs text-green-600">Sell Price</p>
+                                        <p className="font-bold text-green-900">${selectedItem.sellingPrice.toFixed(2)}</p>
+                                    </div>
+                                    <div className="p-3 bg-amber-50 rounded-lg text-center">
+                                        <p className="text-xs text-amber-600">Reorder Lvl</p>
+                                        <p className="font-bold text-amber-900">{selectedItem.reorderLevel}</p>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3 text-sm">
+                                    <div><span className="text-slate-500">Category:</span> <span className="font-medium">{selectedItem.category || '—'}</span></div>
+                                    <div><span className="text-slate-500">UoM:</span> <span className="font-medium">{selectedItem.uom}</span></div>
+                                    <div><span className="text-slate-500">Brand:</span> <span className="font-medium">{selectedItem.brand || '—'}</span></div>
+                                    <div><span className="text-slate-500">Barcode:</span> <span className="font-mono text-xs">{selectedItem.barcode || '—'}</span></div>
+                                    {selectedItem.minStockLevel !== undefined && <div><span className="text-slate-500">Min Stock:</span> <span className="font-medium">{selectedItem.minStockLevel}</span></div>}
+                                    {selectedItem.maxStockLevel !== undefined && <div><span className="text-slate-500">Max Stock:</span> <span className="font-medium">{selectedItem.maxStockLevel}</span></div>}
+                                    {selectedItem.trackBatch && <div><Badge className="bg-purple-100 text-purple-700 border-0">Batch Tracking</Badge></div>}
+                                    {selectedItem.trackExpiry && <div><Badge className="bg-orange-100 text-orange-700 border-0">Expiry Tracking</Badge></div>}
+                                </div>
+                                {selectedItem.supplier?.name && (
+                                    <Card className="border shadow-none">
+                                        <CardContent className="p-3">
+                                            <p className="text-xs font-semibold text-slate-500 uppercase mb-1">Supplier</p>
+                                            <p className="font-medium text-sm">{selectedItem.supplier.name}</p>
+                                            {selectedItem.supplier.code && <p className="text-xs text-slate-500">Code: {selectedItem.supplier.code}</p>}
+                                            {selectedItem.supplier.leadTimeDays ? <p className="text-xs text-slate-500">Lead Time: {selectedItem.supplier.leadTimeDays} days</p> : null}
+                                        </CardContent>
+                                    </Card>
+                                )}
+                                {selectedItem.itemType === 'Asset' && (
+                                    <div className="grid grid-cols-2 gap-3 text-sm">
+                                        <div><span className="text-slate-500">Asset Tag:</span> <span className="font-mono">{selectedItem.assetTag || '—'}</span></div>
+                                        <div><span className="text-slate-500">Asset Status:</span> {selectedItem.assetStatus ? statusBadge(selectedItem.assetStatus) : '—'}</div>
+                                        {selectedItem.currentHolder && <div><span className="text-slate-500">Holder:</span> <span className="font-medium">{selectedItem.currentHolder.name}</span></div>}
+                                        {selectedItem.currentLocation && <div><span className="text-slate-500">Location:</span> <span className="font-medium">{selectedItem.currentLocation.name}</span></div>}
+                                    </div>
+                                )}
+                            </div>
+                            <DialogFooter>
+                                <Button variant="outline" onClick={() => { openEditItem(selectedItem); setSelectedItem(null); }} className="gap-1">
+                                    <Edit size={14} /> Edit
+                                </Button>
+                                <Button variant="outline" onClick={() => setSelectedItem(null)}>Close</Button>
+                            </DialogFooter>
+                        </>
+                    )}
                 </DialogContent>
             </Dialog>
         </AdminLayout>
