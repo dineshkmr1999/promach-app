@@ -379,4 +379,160 @@ router.get('/low-stock', requireRole('Admin', 'Operations_Manager'), async (req,
     }
 });
 
+// ────────────────────────────────────────────────────────────
+// GET /dashboard  — Inventory dashboard summary
+// ────────────────────────────────────────────────────────────
+router.get('/dashboard', requireRole('Admin', 'Operations_Manager'), async (req, res) => {
+    try {
+        const [totalItems, totalLocations, lowStockCount, totalValue, recentTxns] = await Promise.all([
+            MasterItem.countDocuments({ isActive: true }),
+            Location.countDocuments({ isActive: true }),
+            InventoryLedger.aggregate([
+                {
+                    $lookup: {
+                        from: 'masteritems', localField: 'item', foreignField: '_id', as: 'itemInfo'
+                    }
+                },
+                { $unwind: '$itemInfo' },
+                { $match: { 'itemInfo.itemType': 'Consumable', 'itemInfo.isActive': true } },
+                { $addFields: { qtyNum: { $toDouble: '$quantityOnHand' }, reorderNum: { $toDouble: '$itemInfo.reorderLevel' } } },
+                { $match: { $expr: { $lte: ['$qtyNum', '$reorderNum'] } } },
+                { $count: 'count' }
+            ]).then(r => r[0]?.count || 0),
+            InventoryLedger.aggregate([
+                {
+                    $lookup: {
+                        from: 'masteritems', localField: 'item', foreignField: '_id', as: 'itemInfo'
+                    }
+                },
+                { $unwind: '$itemInfo' },
+                { $match: { 'itemInfo.isActive': true } },
+                {
+                    $group: {
+                        _id: null,
+                        totalValue: { $sum: { $multiply: [{ $toDouble: '$quantityOnHand' }, { $toDouble: '$itemInfo.unitCost' }] } }
+                    }
+                }
+            ]).then(r => r[0]?.totalValue || 0),
+            InventoryTransaction.find()
+                .populate('item', 'name sku')
+                .populate('location', 'name')
+                .populate('performedBy', 'name')
+                .sort({ createdAt: -1 })
+                .limit(10)
+        ]);
+
+        res.json({ totalItems, totalLocations, lowStockCount, totalValue, recentTransactions: recentTxns });
+    } catch (error) {
+        console.error('Inventory dashboard error:', error.message);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// ────────────────────────────────────────────────────────────
+// POST /stock-count  — Stock count/audit for a location
+// Compares physical counts with system and creates adjustments
+// ────────────────────────────────────────────────────────────
+router.post('/stock-count', requireRole('Admin', 'Operations_Manager'), async (req, res) => {
+    const session = await mongoose.startSession();
+    try {
+        const { locationId, counts, notes } = req.body;
+        // counts: [{ itemId, physicalQuantity }]
+        if (!locationId || !counts?.length) {
+            return res.status(400).json({ message: 'locationId and counts[] are required' });
+        }
+
+        const adjustments = [];
+        await session.withTransaction(async () => {
+            for (const count of counts) {
+                const physicalQty = parseFloat(String(count.physicalQuantity));
+                const ledger = await InventoryLedger.findOne({
+                    item: count.itemId, location: locationId
+                }).session(session);
+
+                const systemQty = ledger ? parseFloat(ledger.quantityOnHand.toString()) : 0;
+                const variance = physicalQty - systemQty;
+
+                if (variance !== 0) {
+                    await InventoryLedger.findOneAndUpdate(
+                        { item: count.itemId, location: locationId },
+                        { quantityOnHand: mongoose.Types.Decimal128.fromString(String(physicalQty)) },
+                        { upsert: true, session }
+                    );
+
+                    await InventoryTransaction.create([{
+                        txnType: 'Adjust',
+                        item: count.itemId,
+                        location: locationId,
+                        quantity: mongoose.Types.Decimal128.fromString(String(variance)),
+                        performedBy: req.erpUser.id,
+                        notes: notes || `Stock count adjustment: system ${systemQty} → physical ${physicalQty}`
+                    }], { session });
+
+                    adjustments.push({ itemId: count.itemId, systemQty, physicalQty, variance });
+                }
+            }
+        });
+
+        session.endSession();
+        res.json({
+            message: 'Stock count completed',
+            totalCounted: counts.length,
+            adjustmentsMade: adjustments.length,
+            adjustments
+        });
+    } catch (error) {
+        session.endSession();
+        console.error('Stock count error:', error.message);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// ────────────────────────────────────────────────────────────
+// GET /valuation  — Stock valuation report by location
+// ────────────────────────────────────────────────────────────
+router.get('/valuation', requireRole('Admin', 'Operations_Manager'), async (req, res) => {
+    try {
+        const { locationId } = req.query;
+        const match = {};
+        if (locationId) match.location = new mongoose.Types.ObjectId(locationId);
+
+        const valuation = await InventoryLedger.aggregate([
+            { $match: match },
+            {
+                $lookup: {
+                    from: 'masteritems', localField: 'item', foreignField: '_id', as: 'itemInfo'
+                }
+            },
+            { $unwind: '$itemInfo' },
+            { $match: { 'itemInfo.isActive': true } },
+            {
+                $lookup: {
+                    from: 'locations', localField: 'location', foreignField: '_id', as: 'locationInfo'
+                }
+            },
+            { $unwind: '$locationInfo' },
+            {
+                $project: {
+                    item: '$itemInfo.name',
+                    sku: '$itemInfo.sku',
+                    uom: '$itemInfo.uom',
+                    location: '$locationInfo.name',
+                    locationType: '$locationInfo.locationType',
+                    quantityOnHand: { $toDouble: '$quantityOnHand' },
+                    unitCost: { $toDouble: '$itemInfo.unitCost' },
+                    totalValue: { $multiply: [{ $toDouble: '$quantityOnHand' }, { $toDouble: '$itemInfo.unitCost' }] }
+                }
+            },
+            { $sort: { location: 1, item: 1 } }
+        ]);
+
+        const grandTotal = valuation.reduce((sum, row) => sum + row.totalValue, 0);
+        res.json({ valuation, grandTotal });
+    } catch (error) {
+        console.error('Valuation report error:', error.message);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
 module.exports = router;

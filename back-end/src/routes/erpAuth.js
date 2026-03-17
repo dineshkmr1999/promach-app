@@ -111,4 +111,28 @@ router.patch('/users/:id', verifyERPToken, requireRole('Admin'), async (req, res
     }
 });
 
+// ─── POST /register  (Public — creates User role only) ───
+router.post('/register', async (req, res) => {
+    try {
+        const { name, email, password, phone } = req.body;
+        if (!name || !email || !password) {
+            return res.status(400).json({ message: 'Name, email, and password are required' });
+        }
+        const existing = await ERPUser.findOne({ email: email.toLowerCase() });
+        if (existing) {
+            return res.status(409).json({ message: 'Email already registered' });
+        }
+        const user = await ERPUser.create({ name, email, password, phone, role: 'User' });
+        const token = jwt.sign(
+            { id: user._id, email: user.email, role: 'User', erpUser: true },
+            process.env.JWT_SECRET,
+            { expiresIn: process.env.JWT_EXPIRATION || '24h' }
+        );
+        res.status(201).json({ token, user: user.toJSON() });
+    } catch (error) {
+        console.error('Register error:', error.message);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
 module.exports = router;

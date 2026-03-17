@@ -33,8 +33,31 @@ async function erpFetch(path: string, opts: RequestInit = {}) {
 
 // ── Auth ──
 export const erpAuthAPI = {
-  login: (email: string, password: string) =>
-    erpFetch('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+  login: async (email: string, password: string) => {
+    // Login uses its own fetch to avoid the 401 redirect in erpFetch
+    const res = await fetch(`${API_URL}/erp/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ message: 'Request failed' }));
+      throw new Error(body.message || 'Invalid email or password');
+    }
+    return res.json();
+  },
+  register: async (data: { name: string; email: string; password: string; phone?: string }) => {
+    const res = await fetch(`${API_URL}/erp/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ message: 'Request failed' }));
+      throw new Error(body.message || 'Registration failed');
+    }
+    return res.json();
+  },
   me: () => erpFetch('/auth/me'),
   listUsers: (params?: Record<string, string>) => {
     const qs = params ? '?' + new URLSearchParams(params).toString() : '';
@@ -113,6 +136,13 @@ export const inventoryAPI = {
     return erpFetch(`/inventory/transactions${qs}`);
   },
   lowStock: () => erpFetch('/inventory/low-stock'),
+  dashboard: () => erpFetch('/inventory/dashboard'),
+  stockCount: (data: { locationId: string; counts: { itemId: string; physicalQuantity: number }[]; notes?: string }) =>
+    erpFetch('/inventory/stock-count', { method: 'POST', body: JSON.stringify(data) }),
+  valuation: (params?: Record<string, string>) => {
+    const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+    return erpFetch(`/inventory/valuation${qs}`);
+  },
 };
 
 // ── Job Tickets ──
@@ -131,6 +161,37 @@ export const jobTicketsAPI = {
   removeCostLine: (ticketId: string, lineId: string) =>
     erpFetch(`/jobs/${ticketId}/costline/${lineId}`, { method: 'DELETE' }),
   profitability: (id: string) => erpFetch(`/jobs/${id}/profitability`),
+  // ── Job Tracking ──
+  checkin: (id: string, data: { lat: number; lng: number }) =>
+    erpFetch(`/jobs/${id}/checkin`, { method: 'POST', body: JSON.stringify(data) }),
+  start: (id: string) =>
+    erpFetch(`/jobs/${id}/start`, { method: 'POST', body: JSON.stringify({}) }),
+  complete: (id: string, data: { technicianNotes?: string }) =>
+    erpFetch(`/jobs/${id}/complete`, { method: 'POST', body: JSON.stringify(data) }),
+  uploadImages: async (id: string, files: File[], type: 'before' | 'after') => {
+    const formData = new FormData();
+    formData.append('type', type);
+    files.forEach(f => formData.append('images', f));
+    const token = localStorage.getItem('erpToken') || localStorage.getItem('adminToken');
+    const res = await fetch(`${API_URL}/erp/jobs/${id}/images`, {
+      method: 'POST',
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: formData,
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ message: 'Upload failed' }));
+      throw new Error(body.message || 'Upload failed');
+    }
+    return res.json();
+  },
+  history: (params?: Record<string, string>) => {
+    const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+    return erpFetch(`/jobs/history/my${qs}`);
+  },
+  // ── Customer Bookings ──
+  myBookings: () => erpFetch('/jobs/my-bookings'),
+  book: (data: any) =>
+    erpFetch('/jobs/book', { method: 'POST', body: JSON.stringify(data) }),
 };
 
 // ── Assets ──
@@ -146,4 +207,25 @@ export const assetsAPI = {
   maintenance: (id: string, action: string) =>
     erpFetch(`/assets/${id}/maintenance`, { method: 'PATCH', body: JSON.stringify({ action }) }),
   history: (id: string) => erpFetch(`/assets/${id}/history`),
+};
+
+// ── Purchase Orders ──
+export const purchaseOrdersAPI = {
+  list: (params?: Record<string, string>) => {
+    const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+    return erpFetch(`/purchase-orders${qs}`);
+  },
+  get: (id: string) => erpFetch(`/purchase-orders/${id}`),
+  create: (data: any) =>
+    erpFetch('/purchase-orders', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: string, data: any) =>
+    erpFetch(`/purchase-orders/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  submit: (id: string) =>
+    erpFetch(`/purchase-orders/${id}/submit`, { method: 'POST', body: JSON.stringify({}) }),
+  approve: (id: string) =>
+    erpFetch(`/purchase-orders/${id}/approve`, { method: 'POST', body: JSON.stringify({}) }),
+  receive: (id: string, receivedLines: { lineId: string; quantity: number }[]) =>
+    erpFetch(`/purchase-orders/${id}/receive`, { method: 'POST', body: JSON.stringify({ receivedLines }) }),
+  cancel: (id: string) =>
+    erpFetch(`/purchase-orders/${id}/cancel`, { method: 'POST', body: JSON.stringify({}) }),
 };

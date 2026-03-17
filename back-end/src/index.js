@@ -109,6 +109,7 @@ app.use('/api/erp/locations', require('./routes/locations'));
 app.use('/api/erp/inventory', require('./routes/inventory'));
 app.use('/api/erp/jobs', require('./routes/jobTickets'));
 app.use('/api/erp/assets', require('./routes/assets'));
+app.use('/api/erp/purchase-orders', require('./routes/purchaseOrders'));
 
 // Health check
 app.get('/health', (req, res) => {

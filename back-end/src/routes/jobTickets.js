@@ -1,6 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const JobTicket = require('../models/JobTicket');
 const InventoryLedger = require('../models/InventoryLedger');
 const InventoryTransaction = require('../models/InventoryTransaction');
@@ -8,6 +11,31 @@ const MasterItem = require('../models/MasterItem');
 const { verifyERPToken, requireRole } = require('../middleware/erpAuth');
 
 router.use(verifyERPToken);
+
+// ── Multer config for job images ──
+const jobStorage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        const dir = path.join(__dirname, '../../uploads/jobs');
+        fs.mkdirSync(dir, { recursive: true });
+        cb(null, dir);
+    },
+    filename: (req, file, cb) => {
+        const ext = path.extname(file.originalname);
+        cb(null, `job-${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`);
+    }
+});
+const jobUpload = multer({
+    storage: jobStorage,
+    limits: { fileSize: 10 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+        const allowed = /jpeg|jpg|png|webp|heic/;
+        if (allowed.test(file.mimetype) || allowed.test(path.extname(file.originalname).toLowerCase().slice(1))) {
+            cb(null, true);
+        } else {
+            cb(new Error('Only image files are allowed'));
+        }
+    }
+});
 
 // ────────────────────────────────────────────────────────────
 // Helper: Generate sequential ticket number
@@ -39,6 +67,10 @@ router.get('/', async (req, res) => {
         if (req.erpUser.role === 'Field_Technician') {
             filter.assignedTechnicians = req.erpUser.id;
         }
+        // Users only see tickets they created (their bookings)
+        if (req.erpUser.role === 'User') {
+            filter.createdBy = req.erpUser.id;
+        }
 
         const skip = (parseInt(page) - 1) * parseInt(limit);
         const [tickets, total] = await Promise.all([
@@ -54,6 +86,120 @@ router.get('/', async (req, res) => {
         res.json({ tickets, total, page: parseInt(page), totalPages: Math.ceil(total / parseInt(limit)) });
     } catch (error) {
         console.error('List tickets error:', error.message);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// ── Helper: Haversine distance in meters ──
+function haversineDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371000;
+    const toRad = (deg) => (deg * Math.PI) / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// ────────────────────────────────────────────────────────────
+// GET /history/my  — Technician's completed job history
+// Must be before /:id to avoid route conflict
+// ────────────────────────────────────────────────────────────
+router.get('/history/my', async (req, res) => {
+    try {
+        const { page = 1, limit = 20 } = req.query;
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+
+        const filter = {
+            assignedTechnicians: req.erpUser.id,
+            status: { $in: ['Completed', 'Invoiced'] }
+        };
+
+        const [tickets, total] = await Promise.all([
+            JobTicket.find(filter)
+                .select('ticketNumber jobType customer status priority scheduledDate completedAt quotedPrice totalMaterialCost grossProfit tracking.durationMinutes tracking.customerRating')
+                .sort({ completedAt: -1 })
+                .skip(skip)
+                .limit(parseInt(limit)),
+            JobTicket.countDocuments(filter)
+        ]);
+
+        // Compute insights
+        const allCompleted = await JobTicket.find(filter)
+            .select('quotedPrice totalMaterialCost grossProfit tracking.durationMinutes tracking.customerRating');
+
+        let totalRevenue = 0, totalCost = 0, totalProfit = 0, totalDuration = 0, durationCount = 0, totalRating = 0, ratingCount = 0;
+        allCompleted.forEach(t => {
+            totalRevenue += parseFloat(t.quotedPrice?.toString() || '0');
+            totalCost += parseFloat(t.totalMaterialCost?.toString() || '0');
+            totalProfit += parseFloat(t.grossProfit?.toString() || '0');
+            if (t.tracking?.durationMinutes) { totalDuration += t.tracking.durationMinutes; durationCount++; }
+            if (t.tracking?.customerRating) { totalRating += t.tracking.customerRating; ratingCount++; }
+        });
+
+        res.json({
+            tickets,
+            total,
+            page: parseInt(page),
+            totalPages: Math.ceil(total / parseInt(limit)),
+            insights: {
+                totalJobs: total,
+                totalRevenue: parseFloat(totalRevenue.toFixed(2)),
+                totalCost: parseFloat(totalCost.toFixed(2)),
+                totalProfit: parseFloat(totalProfit.toFixed(2)),
+                avgDuration: durationCount > 0 ? Math.round(totalDuration / durationCount) : 0,
+                avgRating: ratingCount > 0 ? parseFloat((totalRating / ratingCount).toFixed(1)) : 0,
+                ratingCount
+            }
+        });
+    } catch (error) {
+        console.error('Job history error:', error.message);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// ────────────────────────────────────────────────────────────
+// GET /my-bookings  — Customer (User role) sees own bookings
+// ────────────────────────────────────────────────────────────
+router.get('/my-bookings', requireRole('User'), async (req, res) => {
+    try {
+        const tickets = await JobTicket.find({ createdBy: req.erpUser.id })
+            .populate('assignedTechnicians', 'name phone')
+            .sort({ scheduledDate: -1 });
+        res.json(tickets);
+    } catch (error) {
+        console.error('My bookings error:', error.message);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// ────────────────────────────────────────────────────────────
+// POST /book  — Customer (User role) creates a booking
+// ────────────────────────────────────────────────────────────
+router.post('/book', requireRole('User'), async (req, res) => {
+    try {
+        const { jobType, scheduledDate, scheduledTimeSlot, customerName, customerPhone, customerEmail,
+            street, unit, postalCode, building, customerRemarks } = req.body;
+
+        if (!jobType || !scheduledDate || !customerName) {
+            return res.status(400).json({ message: 'jobType, scheduledDate, and customerName are required' });
+        }
+
+        const ticketNumber = await nextTicketNumber();
+        const ticket = await JobTicket.create({
+            ticketNumber,
+            jobType,
+            status: 'Scheduled',
+            customer: { name: customerName, email: customerEmail, phone: customerPhone },
+            siteAddress: { street, unit, postalCode, building },
+            scheduledDate: new Date(scheduledDate),
+            scheduledTimeSlot,
+            customerRemarks,
+            createdBy: req.erpUser.id
+        });
+
+        res.status(201).json(ticket);
+    } catch (error) {
+        console.error('Customer booking error:', error.message);
         res.status(500).json({ message: 'Server error' });
     }
 });
@@ -98,21 +244,188 @@ router.post('/', requireRole('Admin', 'Operations_Manager'), async (req, res) =>
 
 // ────────────────────────────────────────────────────────────
 // PATCH /:id  — Update ticket (status, assignment, etc.)
+// Admin/Ops can update anything; technicians can only update status & notes on their jobs
 // ────────────────────────────────────────────────────────────
-router.patch('/:id', requireRole('Admin', 'Operations_Manager'), async (req, res) => {
+router.patch('/:id', async (req, res) => {
     try {
+        const ticket = await JobTicket.findById(req.params.id);
+        if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
+
         // Protect immutable fields
         delete req.body.ticketNumber;
         delete req.body.costLines;
         delete req.body.totalMaterialCost;
         delete req.body.grossProfit;
 
-        const ticket = await JobTicket.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true })
+        if (req.erpUser.role === 'Field_Technician') {
+            // Technicians can only update status and notes on their assigned jobs
+            const isAssigned = ticket.assignedTechnicians.some(t => t.toString() === req.erpUser.id);
+            if (!isAssigned) return res.status(403).json({ message: 'You are not assigned to this job' });
+
+            const allowedFields = ['status', 'internalNotes'];
+            const allowedStatuses = ['In_Progress', 'On_Hold', 'Completed'];
+            if (req.body.status && !allowedStatuses.includes(req.body.status)) {
+                return res.status(403).json({ message: 'Technicians can only set status to In_Progress, On_Hold, or Completed' });
+            }
+            const updates = {};
+            allowedFields.forEach(f => { if (req.body[f] !== undefined) updates[f] = req.body[f]; });
+            if (req.body.status === 'Completed') updates.completedAt = new Date();
+
+            const updated = await JobTicket.findByIdAndUpdate(req.params.id, updates, { new: true, runValidators: true })
+                .populate('assignedTechnicians', 'name phone');
+            return res.json(updated);
+        }
+
+        // Admin/Ops Manager — full update
+        if (!['Admin', 'Operations_Manager'].includes(req.erpUser.role)) {
+            return res.status(403).json({ message: 'Insufficient permissions' });
+        }
+
+        const updated = await JobTicket.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true })
             .populate('assignedTechnicians', 'name phone');
-        if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
-        res.json(ticket);
+        res.json(updated);
     } catch (error) {
         console.error('Update ticket error:', error.message);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// ────────────────────────────────────────────────────────────
+// POST /:id/checkin  — Technician checks in at job site
+// Verifies location is within radius of customer site
+// ────────────────────────────────────────────────────────────
+router.post('/:id/checkin', async (req, res) => {
+    try {
+        const { lat, lng } = req.body;
+        if (!lat || !lng) return res.status(400).json({ message: 'lat and lng are required' });
+
+        const ticket = await JobTicket.findById(req.params.id);
+        if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
+
+        const isAssigned = ticket.assignedTechnicians.some(t => t.toString() === req.erpUser.id);
+        if (!isAssigned && req.erpUser.role === 'Field_Technician') {
+            return res.status(403).json({ message: 'You are not assigned to this job' });
+        }
+
+        // Check distance if site coordinates exist (radius: 500m)
+        if (ticket.tracking?.siteCoordinates?.lat && ticket.tracking?.siteCoordinates?.lng) {
+            const dist = haversineDistance(lat, lng, ticket.tracking.siteCoordinates.lat, ticket.tracking.siteCoordinates.lng);
+            if (dist > 500) {
+                return res.status(400).json({
+                    message: `You are ${Math.round(dist)}m from the job site. Please be within 500m to check in.`,
+                    distance: Math.round(dist)
+                });
+            }
+        }
+
+        ticket.tracking = ticket.tracking || {};
+        ticket.tracking.checkedInAt = new Date();
+        ticket.tracking.checkedInLocation = { lat, lng };
+        await ticket.save();
+
+        res.json({ message: 'Checked in successfully', checkedInAt: ticket.tracking.checkedInAt });
+    } catch (error) {
+        console.error('Check-in error:', error.message);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// ────────────────────────────────────────────────────────────
+// POST /:id/start  — Technician starts the job (begins timer)
+// ────────────────────────────────────────────────────────────
+router.post('/:id/start', async (req, res) => {
+    try {
+        const ticket = await JobTicket.findById(req.params.id);
+        if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
+
+        const isAssigned = ticket.assignedTechnicians.some(t => t.toString() === req.erpUser.id);
+        if (!isAssigned && req.erpUser.role === 'Field_Technician') {
+            return res.status(403).json({ message: 'You are not assigned to this job' });
+        }
+
+        ticket.tracking = ticket.tracking || {};
+        ticket.tracking.startedAt = new Date();
+        ticket.status = 'In_Progress';
+        await ticket.save();
+
+        res.json({ message: 'Job started', startedAt: ticket.tracking.startedAt, status: ticket.status });
+    } catch (error) {
+        console.error('Start job error:', error.message);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// ────────────────────────────────────────────────────────────
+// POST /:id/complete  — Technician completes the job
+// ────────────────────────────────────────────────────────────
+router.post('/:id/complete', async (req, res) => {
+    try {
+        const { technicianNotes } = req.body;
+        const ticket = await JobTicket.findById(req.params.id);
+        if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
+
+        const isAssigned = ticket.assignedTechnicians.some(t => t.toString() === req.erpUser.id);
+        if (!isAssigned && req.erpUser.role === 'Field_Technician') {
+            return res.status(403).json({ message: 'You are not assigned to this job' });
+        }
+
+        ticket.tracking = ticket.tracking || {};
+        ticket.tracking.finishedAt = new Date();
+        if (technicianNotes) ticket.tracking.technicianNotes = technicianNotes;
+
+        // Calculate duration
+        if (ticket.tracking.startedAt) {
+            const diffMs = ticket.tracking.finishedAt - ticket.tracking.startedAt;
+            ticket.tracking.durationMinutes = Math.round(diffMs / 60000);
+        }
+
+        ticket.status = 'Completed';
+        ticket.completedAt = new Date();
+        await ticket.save();
+
+        const populated = await JobTicket.findById(ticket._id)
+            .populate('assignedTechnicians', 'name phone');
+        res.json(populated);
+    } catch (error) {
+        console.error('Complete job error:', error.message);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// ────────────────────────────────────────────────────────────
+// POST /:id/images  — Upload before/after images
+// ────────────────────────────────────────────────────────────
+router.post('/:id/images', jobUpload.array('images', 10), async (req, res) => {
+    try {
+        const { type } = req.body; // 'before' or 'after'
+        if (!['before', 'after'].includes(type)) {
+            return res.status(400).json({ message: 'type must be "before" or "after"' });
+        }
+
+        const ticket = await JobTicket.findById(req.params.id);
+        if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
+
+        const isAssigned = ticket.assignedTechnicians.some(t => t.toString() === req.erpUser.id);
+        if (!isAssigned && req.erpUser.role === 'Field_Technician') {
+            return res.status(403).json({ message: 'You are not assigned to this job' });
+        }
+
+        const imagePaths = (req.files || []).map(f => `/uploads/jobs/${f.filename}`);
+        ticket.tracking = ticket.tracking || {};
+
+        if (type === 'before') {
+            ticket.tracking.beforeImages = [...(ticket.tracking.beforeImages || []), ...imagePaths];
+        } else {
+            ticket.tracking.afterImages = [...(ticket.tracking.afterImages || []), ...imagePaths];
+        }
+
+        await ticket.save();
+        res.json({
+            message: `${type} images uploaded`,
+            images: type === 'before' ? ticket.tracking.beforeImages : ticket.tracking.afterImages
+        });
+    } catch (error) {
+        console.error('Upload images error:', error.message);
         res.status(500).json({ message: 'Server error' });
     }
 });

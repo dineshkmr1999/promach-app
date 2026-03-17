@@ -123,6 +123,38 @@ const jobTicketSchema = new mongoose.Schema({
         trim: true
     },
 
+    // ── Job Tracking (Technician Field Data) ──
+    tracking: {
+        // Location check-in when tech arrives
+        checkedInAt: { type: Date },
+        checkedInLocation: {
+            lat: { type: Number },
+            lng: { type: Number }
+        },
+        // Customer site coordinates for radius validation
+        siteCoordinates: {
+            lat: { type: Number },
+            lng: { type: Number }
+        },
+        // Job started timestamp (after location verified)
+        startedAt: { type: Date },
+        // Job finished timestamp
+        finishedAt: { type: Date },
+        // Total duration in minutes (auto-computed)
+        durationMinutes: { type: Number },
+        // Before images (uploaded when starting)
+        beforeImages: [{ type: String }],
+        // After images (uploaded when completing)
+        afterImages: [{ type: String }],
+        // Technician's on-site notes
+        technicianNotes: { type: String, trim: true },
+        // Signature (base64 or URL)
+        customerSignature: { type: String },
+        // Rating given by customer
+        customerRating: { type: Number, min: 1, max: 5 },
+        customerFeedback: { type: String, trim: true }
+    },
+
     // ── Linked Submission (from CMS booking form) ──
     linkedSubmission: {
         type: mongoose.Schema.Types.ObjectId,

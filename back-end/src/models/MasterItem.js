@@ -63,6 +63,37 @@ const masterItemSchema = new mongoose.Schema({
         type: mongoose.Types.Decimal128,
         default: mongoose.Types.Decimal128.fromString('0')
     },
+    minStockLevel: {
+        type: mongoose.Types.Decimal128,
+        default: mongoose.Types.Decimal128.fromString('0')
+    },
+    maxStockLevel: {
+        type: mongoose.Types.Decimal128,
+        default: mongoose.Types.Decimal128.fromString('0')
+    },
+
+    // ── Supplier / Purchase Info ──
+    supplier: {
+        name: { type: String, trim: true },
+        code: { type: String, trim: true },
+        leadTimeDays: { type: Number, default: 0 },
+        lastPurchasePrice: { type: mongoose.Types.Decimal128, default: mongoose.Types.Decimal128.fromString('0') }
+    },
+    barcode: {
+        type: String,
+        trim: true,
+        sparse: true
+    },
+
+    // ── Batch / Expiry Tracking ──
+    trackBatch: {
+        type: Boolean,
+        default: false
+    },
+    trackExpiry: {
+        type: Boolean,
+        default: false
+    },
 
     // ── Asset/Tool-specific ──
     assetTag: {
@@ -111,6 +142,9 @@ masterItemSchema.set('toJSON', {
         if (ret.unitCost) ret.unitCost = parseFloat(ret.unitCost.toString());
         if (ret.sellingPrice) ret.sellingPrice = parseFloat(ret.sellingPrice.toString());
         if (ret.reorderLevel) ret.reorderLevel = parseFloat(ret.reorderLevel.toString());
+        if (ret.minStockLevel) ret.minStockLevel = parseFloat(ret.minStockLevel.toString());
+        if (ret.maxStockLevel) ret.maxStockLevel = parseFloat(ret.maxStockLevel.toString());
+        if (ret.supplier?.lastPurchasePrice) ret.supplier.lastPurchasePrice = parseFloat(ret.supplier.lastPurchasePrice.toString());
         if (ret.kitComponents) {
             ret.kitComponents = ret.kitComponents.map(kc => ({
                 ...kc,
@@ -125,5 +159,6 @@ masterItemSchema.index({ sku: 1 });
 masterItemSchema.index({ itemType: 1, isActive: 1 });
 masterItemSchema.index({ name: 'text', sku: 'text' });
 masterItemSchema.index({ assetTag: 1 }, { sparse: true });
+masterItemSchema.index({ barcode: 1 }, { sparse: true });
 
 module.exports = mongoose.model('MasterItem', masterItemSchema);

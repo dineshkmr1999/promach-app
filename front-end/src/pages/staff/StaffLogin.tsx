@@ -12,11 +12,23 @@ export default function StaffLogin() {
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
+    const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
     const navigate = useNavigate();
+
+    const validate = () => {
+        const errs: { email?: string; password?: string } = {};
+        if (!email.trim()) errs.email = 'Email is required';
+        else if (!/\S+@\S+\.\S+/.test(email)) errs.email = 'Enter a valid email address';
+        if (!password) errs.password = 'Password is required';
+        else if (password.length < 8) errs.password = 'Password must be at least 8 characters';
+        setFieldErrors(errs);
+        return Object.keys(errs).length === 0;
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
+        if (!validate()) return;
         setIsLoading(true);
 
         try {
@@ -25,7 +37,13 @@ export default function StaffLogin() {
             localStorage.setItem('erpUser', JSON.stringify(response.user));
             navigate('/staff/dashboard');
         } catch (err: any) {
-            setError(err.message || 'Invalid email or password');
+            const msg = err.message || 'Invalid email or password';
+            // Show as inline password error for credential failures
+            if (msg.toLowerCase().includes('invalid') || msg.toLowerCase().includes('credentials')) {
+                setFieldErrors({ password: msg });
+            } else {
+                setError(msg);
+            }
         } finally {
             setIsLoading(false);
         }
@@ -63,13 +81,13 @@ export default function StaffLogin() {
                                     id="email"
                                     type="email"
                                     value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
+                                    onChange={(e) => { setEmail(e.target.value); setFieldErrors(prev => ({ ...prev, email: undefined })); }}
                                     placeholder="staff@promachpl.com"
-                                    className="pl-9 h-11 rounded-xl border-slate-200 focus:border-primary focus:ring-primary/20"
-                                    required
+                                    className={`pl-9 h-11 rounded-xl focus:ring-primary/20 ${fieldErrors.email ? 'border-red-400 focus:border-red-500' : 'border-slate-200 focus:border-primary'}`}
                                     autoComplete="email"
                                 />
                             </div>
+                            {fieldErrors.email && <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle size={12} />{fieldErrors.email}</p>}
                         </div>
 
                         <div className="space-y-1.5">
@@ -80,10 +98,9 @@ export default function StaffLogin() {
                                     id="password"
                                     type={showPassword ? 'text' : 'password'}
                                     value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
+                                    onChange={(e) => { setPassword(e.target.value); setFieldErrors(prev => ({ ...prev, password: undefined })); }}
                                     placeholder="Enter your password"
-                                    className="pl-9 pr-11 h-11 rounded-xl border-slate-200 focus:border-primary focus:ring-primary/20"
-                                    required
+                                    className={`pl-9 pr-11 h-11 rounded-xl focus:ring-primary/20 ${fieldErrors.password ? 'border-red-400 focus:border-red-500' : 'border-slate-200 focus:border-primary'}`}
                                     autoComplete="current-password"
                                 />
                                 <button
@@ -95,6 +112,7 @@ export default function StaffLogin() {
                                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                                 </button>
                             </div>
+                            {fieldErrors.password && <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle size={12} />{fieldErrors.password}</p>}
                         </div>
 
                         {error && (

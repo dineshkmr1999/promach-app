@@ -14,9 +14,10 @@ import PromachLoader from '@/components/PromachLoader';
 import {
     Package, MapPin, ArrowLeftRight, Briefcase, Wrench, Plus, Search, RefreshCw,
     Warehouse, Truck, Building2, AlertTriangle, TrendingDown, CheckCircle2, Clock,
-    ChevronRight, Send, Download, Eye, Trash2, Edit, Users
+    ChevronRight, Send, Download, Eye, Trash2, Edit, Users, ShoppingCart,
+    FileText, BarChart3, ClipboardCheck, DollarSign, Loader2
 } from 'lucide-react';
-import { itemsAPI, locationsAPI, inventoryAPI, jobTicketsAPI, assetsAPI, erpAuthAPI } from '@/services/erpApi';
+import { itemsAPI, locationsAPI, inventoryAPI, jobTicketsAPI, assetsAPI, erpAuthAPI, purchaseOrdersAPI } from '@/services/erpApi';
 import { useToast } from '@/hooks/use-toast';
 
 // ── Types ──
@@ -63,6 +64,20 @@ interface LowStockItem {
     item: string; sku: string; uom: string; location: string; locationType: string;
     quantityOnHand: number; reorderLevel: number;
 }
+interface PurchaseOrder {
+    _id: string; poNumber: string; status: string;
+    supplier: { name: string; code?: string; contactPerson?: string; phone?: string; email?: string };
+    lines: { _id: string; item: { _id: string; name: string; sku: string; uom: string }; quantity: number; unitCost: number; receivedQuantity: number }[];
+    deliverTo: { _id: string; name: string; locationType: string };
+    expectedDeliveryDate?: string; totalAmount: number; notes?: string;
+    relatedJobTicket?: { _id: string; ticketNumber: string };
+    createdBy?: { _id: string; name: string }; approvedBy?: { _id: string; name: string };
+    createdAt: string; approvedAt?: string;
+}
+interface ValuationRow {
+    item: string; sku: string; uom: string; location: string; locationType: string;
+    quantityOnHand: number; unitCost: number; totalValue: number;
+}
 
 // ── Helper: Status badge color ──
 function statusBadge(status: string) {
@@ -71,6 +86,9 @@ function statusBadge(status: string) {
         In_Transit: 'bg-blue-100 text-blue-800',
         Received: 'bg-green-100 text-green-800',
         Cancelled: 'bg-red-100 text-red-800',
+        Submitted: 'bg-blue-100 text-blue-800',
+        Approved: 'bg-emerald-100 text-emerald-800',
+        Partially_Received: 'bg-amber-100 text-amber-800',
         Draft: 'bg-slate-100 text-slate-600',
         Scheduled: 'bg-blue-100 text-blue-800',
         In_Progress: 'bg-amber-100 text-amber-800',
@@ -97,7 +115,7 @@ export default function InventoryManagement() {
     const [itemTypeFilter, setItemTypeFilter] = useState('');
     const [showItemDialog, setShowItemDialog] = useState(false);
     const [editingItem, setEditingItem] = useState<MasterItem | null>(null);
-    const [itemForm, setItemForm] = useState({ sku: '', name: '', description: '', itemType: 'Consumable', category: '', uom: 'Units', unitCost: '0', sellingPrice: '0', reorderLevel: '0', assetTag: '', brand: '' });
+    const [itemForm, setItemForm] = useState({ sku: '', name: '', description: '', itemType: 'Consumable', category: '', uom: 'Units', unitCost: '0', sellingPrice: '0', reorderLevel: '0', assetTag: '', brand: '', barcode: '', supplierName: '', supplierCode: '', supplierLeadTime: '', minStockLevel: '0', maxStockLevel: '0', trackBatch: false, trackExpiry: false });
 
     // ── Locations state ──
     const [locations, setLocations] = useState<Location[]>([]);
@@ -125,6 +143,16 @@ export default function InventoryManagement() {
 
     // ── Low stock ──
     const [lowStock, setLowStock] = useState<LowStockItem[]>([]);
+
+    // ── Purchase Orders ──
+    const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
+    const [showPODialog, setShowPODialog] = useState(false);
+    const [poForm, setPOForm] = useState({ supplierName: '', supplierCode: '', deliverTo: '', expectedDeliveryDate: '', notes: '', lines: [{ itemId: '', quantity: '', unitCost: '' }] });
+
+    // ── Reports / Valuation ──
+    const [valuation, setValuation] = useState<ValuationRow[]>([]);
+    const [valuationTotal, setValuationTotal] = useState(0);
+    const [loadingReport, setLoadingReport] = useState(false);
 
     // ── Data loaders ──
     const loadItems = useCallback(async () => {
@@ -172,6 +200,18 @@ export default function InventoryManagement() {
         catch { /* Silently fail — user may not have access */ }
     }, []);
 
+    const loadPurchaseOrders = useCallback(async () => {
+        try { const data = await purchaseOrdersAPI.list(); setPurchaseOrders(data.orders); }
+        catch { toast({ title: 'Error', description: 'Failed to load purchase orders', variant: 'destructive' }); }
+    }, [toast]);
+
+    const loadValuation = useCallback(async () => {
+        setLoadingReport(true);
+        try { const data = await inventoryAPI.valuation(); setValuation(data.valuation); setValuationTotal(data.grandTotal); }
+        catch { /* non-critical */ }
+        finally { setLoadingReport(false); }
+    }, []);
+
     // Load data on tab change
     useEffect(() => {
         if (activeTab === 'items') loadItems();
@@ -179,7 +219,9 @@ export default function InventoryManagement() {
         if (activeTab === 'transfers') { loadTransfers(); loadLocations(); }
         if (activeTab === 'jobs') loadJobs();
         if (activeTab === 'assets') loadAssets();
-    }, [activeTab, loadItems, loadLocations, loadTransfers, loadJobs, loadAssets]);
+        if (activeTab === 'purchase-orders') { loadPurchaseOrders(); loadLocations(); loadItems(); }
+        if (activeTab === 'reports') loadValuation();
+    }, [activeTab, loadItems, loadLocations, loadTransfers, loadJobs, loadAssets, loadPurchaseOrders, loadValuation]);
 
     // Load low stock on mount
     useEffect(() => { loadLowStock(); }, [loadLowStock]);
@@ -194,7 +236,7 @@ export default function InventoryManagement() {
     // ── Item CRUD handlers ──
     const openNewItem = () => {
         setEditingItem(null);
-        setItemForm({ sku: '', name: '', description: '', itemType: 'Consumable', category: '', uom: 'Units', unitCost: '0', sellingPrice: '0', reorderLevel: '0', assetTag: '', brand: '' });
+        setItemForm({ sku: '', name: '', description: '', itemType: 'Consumable', category: '', uom: 'Units', unitCost: '0', sellingPrice: '0', reorderLevel: '0', assetTag: '', brand: '', barcode: '', supplierName: '', supplierCode: '', supplierLeadTime: '', minStockLevel: '0', maxStockLevel: '0', trackBatch: false, trackExpiry: false });
         setShowItemDialog(true);
     };
     const openEditItem = (item: MasterItem) => {
@@ -203,13 +245,17 @@ export default function InventoryManagement() {
             sku: item.sku, name: item.name, description: item.description || '',
             itemType: item.itemType, category: item.category || '', uom: item.uom,
             unitCost: String(item.unitCost), sellingPrice: String(item.sellingPrice),
-            reorderLevel: String(item.reorderLevel), assetTag: item.assetTag || '', brand: item.brand || ''
+            reorderLevel: String(item.reorderLevel), assetTag: item.assetTag || '', brand: item.brand || '',
+            barcode: item.barcode || '', supplierName: item.supplier?.name || '', supplierCode: item.supplier?.code || '',
+            supplierLeadTime: String(item.supplier?.leadTimeDays || ''), minStockLevel: String(item.minStockLevel || 0),
+            maxStockLevel: String(item.maxStockLevel || 0), trackBatch: item.trackBatch || false, trackExpiry: item.trackExpiry || false
         });
         setShowItemDialog(true);
     };
     const handleSaveItem = async () => {
         try {
-            const payload = { ...itemForm, unitCost: parseFloat(itemForm.unitCost) || 0, sellingPrice: parseFloat(itemForm.sellingPrice) || 0, reorderLevel: parseFloat(itemForm.reorderLevel) || 0 };
+            const { supplierName, supplierCode, supplierLeadTime, minStockLevel, maxStockLevel, ...rest } = itemForm;
+            const payload = { ...rest, unitCost: parseFloat(itemForm.unitCost) || 0, sellingPrice: parseFloat(itemForm.sellingPrice) || 0, reorderLevel: parseFloat(itemForm.reorderLevel) || 0, minStockLevel: parseFloat(minStockLevel) || 0, maxStockLevel: parseFloat(maxStockLevel) || 0, supplier: { name: supplierName, code: supplierCode, leadTimeDays: parseInt(supplierLeadTime) || 0 } };
             if (editingItem) { await itemsAPI.update(editingItem._id, payload); toast({ title: 'Item updated' }); }
             else { await itemsAPI.create(payload); toast({ title: 'Item created' }); }
             setShowItemDialog(false); loadItems();
@@ -276,6 +322,40 @@ export default function InventoryManagement() {
         catch (err: any) { toast({ title: 'Error', description: err.message, variant: 'destructive' }); }
     };
 
+    // ── PO handlers ──
+    const handleCreatePO = async () => {
+        try {
+            const payload = {
+                supplier: { name: poForm.supplierName, code: poForm.supplierCode },
+                deliverTo: poForm.deliverTo,
+                expectedDeliveryDate: poForm.expectedDeliveryDate || undefined,
+                notes: poForm.notes,
+                lines: poForm.lines.filter(l => l.itemId && l.quantity).map(l => ({
+                    itemId: l.itemId, quantity: parseFloat(l.quantity), unitCost: parseFloat(l.unitCost) || 0
+                }))
+            };
+            await purchaseOrdersAPI.create(payload);
+            toast({ title: 'Purchase order created' }); setShowPODialog(false); loadPurchaseOrders();
+        } catch (err: any) { toast({ title: 'Error', description: err.message, variant: 'destructive' }); }
+    };
+    const handleApprovePO = async (id: string) => {
+        try { await purchaseOrdersAPI.approve(id); toast({ title: 'PO approved' }); loadPurchaseOrders(); }
+        catch (err: any) { toast({ title: 'Error', description: err.message, variant: 'destructive' }); }
+    };
+    const handleReceivePO = async (po: PurchaseOrder) => {
+        try {
+            const receivedLines = po.lines
+                .filter(l => l.receivedQuantity < l.quantity)
+                .map(l => ({ lineId: l._id, quantity: l.quantity - l.receivedQuantity }));
+            await purchaseOrdersAPI.receive(po._id, receivedLines);
+            toast({ title: 'PO goods received into inventory' }); loadPurchaseOrders();
+        } catch (err: any) { toast({ title: 'Error', description: err.message, variant: 'destructive' }); }
+    };
+    const handleCancelPO = async (id: string) => {
+        try { await purchaseOrdersAPI.cancel(id); toast({ title: 'PO cancelled' }); loadPurchaseOrders(); }
+        catch (err: any) { toast({ title: 'Error', description: err.message, variant: 'destructive' }); }
+    };
+
     const locationIcon = (type: string) => {
         if (type === 'Warehouse') return <Warehouse size={16} className="text-blue-600" />;
         if (type === 'Van') return <Truck size={16} className="text-amber-600" />;
@@ -329,12 +409,14 @@ export default function InventoryManagement() {
 
                 {/* Tabs */}
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-                    <TabsList className="bg-slate-100 p-1 rounded-xl">
+                    <TabsList className="bg-slate-100 p-1 rounded-xl flex-wrap">
                         <TabsTrigger value="items" className="rounded-lg gap-1.5 data-[state=active]:shadow-sm"><Package size={16} /> Items</TabsTrigger>
                         <TabsTrigger value="locations" className="rounded-lg gap-1.5 data-[state=active]:shadow-sm"><MapPin size={16} /> Locations</TabsTrigger>
                         <TabsTrigger value="transfers" className="rounded-lg gap-1.5 data-[state=active]:shadow-sm"><ArrowLeftRight size={16} /> Transfers</TabsTrigger>
+                        <TabsTrigger value="purchase-orders" className="rounded-lg gap-1.5 data-[state=active]:shadow-sm"><ShoppingCart size={16} /> Purchase Orders</TabsTrigger>
                         <TabsTrigger value="jobs" className="rounded-lg gap-1.5 data-[state=active]:shadow-sm"><Briefcase size={16} /> Jobs</TabsTrigger>
                         <TabsTrigger value="assets" className="rounded-lg gap-1.5 data-[state=active]:shadow-sm"><Wrench size={16} /> Assets</TabsTrigger>
+                        <TabsTrigger value="reports" className="rounded-lg gap-1.5 data-[state=active]:shadow-sm"><BarChart3 size={16} /> Reports</TabsTrigger>
                     </TabsList>
 
                     {/* ═══════════════════ ITEMS TAB ═══════════════════ */}
@@ -638,6 +720,116 @@ export default function InventoryManagement() {
                             ))}
                         </div>
                     </TabsContent>
+
+                    {/* ═══════════════════ PURCHASE ORDERS TAB ═══════════════════ */}
+                    <TabsContent value="purchase-orders" className="space-y-4">
+                        <div className="flex justify-between items-center">
+                            <p className="text-sm text-slate-500">{purchaseOrders.length} purchase order(s)</p>
+                            <Button onClick={() => { setPOForm({ supplierName: '', supplierCode: '', deliverTo: '', expectedDeliveryDate: '', notes: '', lines: [{ itemId: '', quantity: '', unitCost: '' }] }); setShowPODialog(true); }} className="gap-1.5"><Plus size={16} /> New PO</Button>
+                        </div>
+
+                        <Card className="border-0 shadow-sm overflow-hidden">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow className="bg-slate-50">
+                                        <TableHead className="font-semibold">PO #</TableHead>
+                                        <TableHead className="font-semibold">Supplier</TableHead>
+                                        <TableHead className="font-semibold">Deliver To</TableHead>
+                                        <TableHead className="font-semibold">Lines</TableHead>
+                                        <TableHead className="font-semibold text-right">Amount</TableHead>
+                                        <TableHead className="font-semibold">Status</TableHead>
+                                        <TableHead className="font-semibold">Date</TableHead>
+                                        <TableHead className="font-semibold text-center">Actions</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {purchaseOrders.length === 0 ? (
+                                        <TableRow><TableCell colSpan={8} className="text-center text-slate-400 py-10">No purchase orders yet</TableCell></TableRow>
+                                    ) : purchaseOrders.map(po => (
+                                        <TableRow key={po._id} className="hover:bg-slate-50">
+                                            <TableCell className="font-mono text-sm font-medium">{po.poNumber}</TableCell>
+                                            <TableCell>
+                                                <p className="font-medium text-sm">{po.supplier.name}</p>
+                                                {po.supplier.code && <p className="text-xs text-slate-500">{po.supplier.code}</p>}
+                                            </TableCell>
+                                            <TableCell><div className="flex items-center gap-1.5">{locationIcon(po.deliverTo?.locationType || 'Warehouse')}<span className="text-sm">{po.deliverTo?.name}</span></div></TableCell>
+                                            <TableCell className="text-sm">{po.lines.length} item(s)</TableCell>
+                                            <TableCell className="text-right font-mono font-bold">${po.totalAmount.toFixed(2)}</TableCell>
+                                            <TableCell>{statusBadge(po.status)}</TableCell>
+                                            <TableCell className="text-sm text-slate-500">{new Date(po.createdAt).toLocaleDateString()}</TableCell>
+                                            <TableCell className="text-center">
+                                                <div className="flex justify-center gap-1.5 flex-wrap">
+                                                    {po.status === 'Submitted' && (
+                                                        <Button size="sm" className="gap-1 text-xs" onClick={() => handleApprovePO(po._id)}><CheckCircle2 size={12} /> Approve</Button>
+                                                    )}
+                                                    {['Approved', 'Partially_Received'].includes(po.status) && (
+                                                        <Button size="sm" variant="outline" className="gap-1 text-xs" onClick={() => handleReceivePO(po)}><Download size={12} /> Receive All</Button>
+                                                    )}
+                                                    {!['Received', 'Cancelled'].includes(po.status) && (
+                                                        <Button size="sm" variant="ghost" className="gap-1 text-xs text-red-500 hover:text-red-700" onClick={() => handleCancelPO(po._id)}><Trash2 size={12} /> Cancel</Button>
+                                                    )}
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </Card>
+                    </TabsContent>
+
+                    {/* ═══════════════════ REPORTS TAB ═══════════════════ */}
+                    <TabsContent value="reports" className="space-y-4">
+                        <div className="flex justify-between items-center">
+                            <div>
+                                <h3 className="text-lg font-bold text-slate-900">Stock Valuation Report</h3>
+                                <p className="text-sm text-slate-500">Total inventory value across all locations</p>
+                            </div>
+                            <Button variant="outline" onClick={loadValuation} className="gap-1.5"><RefreshCw size={14} /> Refresh</Button>
+                        </div>
+
+                        <Card className="border-0 shadow-sm p-4">
+                            <div className="flex items-center gap-3">
+                                <div className="w-12 h-12 bg-green-50 rounded-xl flex items-center justify-center"><DollarSign size={24} className="text-green-600" /></div>
+                                <div>
+                                    <p className="text-3xl font-bold text-slate-900">${valuationTotal.toFixed(2)}</p>
+                                    <p className="text-sm text-slate-500">Total Inventory Value (SGD)</p>
+                                </div>
+                            </div>
+                        </Card>
+
+                        <Card className="border-0 shadow-sm overflow-hidden">
+                            {loadingReport ? <div className="p-8"><PromachLoader variant="inline" /></div> : (
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow className="bg-slate-50">
+                                            <TableHead className="font-semibold">Item</TableHead>
+                                            <TableHead className="font-semibold">SKU</TableHead>
+                                            <TableHead className="font-semibold">Location</TableHead>
+                                            <TableHead className="font-semibold text-right">Qty</TableHead>
+                                            <TableHead className="font-semibold">UoM</TableHead>
+                                            <TableHead className="font-semibold text-right">Unit Cost</TableHead>
+                                            <TableHead className="font-semibold text-right">Total Value</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {valuation.length === 0 ? (
+                                            <TableRow><TableCell colSpan={7} className="text-center text-slate-400 py-10">No inventory data</TableCell></TableRow>
+                                        ) : valuation.map((row, i) => (
+                                            <TableRow key={i} className="hover:bg-slate-50">
+                                                <TableCell className="font-medium">{row.item}</TableCell>
+                                                <TableCell className="font-mono text-xs">{row.sku}</TableCell>
+                                                <TableCell><div className="flex items-center gap-1.5">{locationIcon(row.locationType)}<span className="text-sm">{row.location}</span></div></TableCell>
+                                                <TableCell className="text-right font-mono">{row.quantityOnHand}</TableCell>
+                                                <TableCell className="text-slate-600">{row.uom}</TableCell>
+                                                <TableCell className="text-right font-mono">${row.unitCost.toFixed(2)}</TableCell>
+                                                <TableCell className="text-right font-mono font-bold">${row.totalValue.toFixed(2)}</TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            )}
+                        </Card>
+                    </TabsContent>
                 </Tabs>
             </div>
 
@@ -709,6 +901,47 @@ export default function InventoryManagement() {
                                 <Input value={itemForm.assetTag} onChange={e => setItemForm(p => ({ ...p, assetTag: e.target.value }))} placeholder="e.g. TOOL-VP-001" />
                             </div>
                         )}
+                        <div>
+                            <Label>Barcode</Label>
+                            <Input value={itemForm.barcode} onChange={e => setItemForm(p => ({ ...p, barcode: e.target.value }))} placeholder="Scan or enter barcode" />
+                        </div>
+                        <div className="border rounded-lg p-3 space-y-3">
+                            <p className="text-sm font-semibold text-slate-700">Supplier Info</p>
+                            <div className="grid grid-cols-3 gap-3">
+                                <div>
+                                    <Label className="text-xs">Supplier Name</Label>
+                                    <Input value={itemForm.supplierName} onChange={e => setItemForm(p => ({ ...p, supplierName: e.target.value }))} />
+                                </div>
+                                <div>
+                                    <Label className="text-xs">Supplier Code</Label>
+                                    <Input value={itemForm.supplierCode} onChange={e => setItemForm(p => ({ ...p, supplierCode: e.target.value }))} />
+                                </div>
+                                <div>
+                                    <Label className="text-xs">Lead Time (days)</Label>
+                                    <Input type="number" value={itemForm.supplierLeadTime} onChange={e => setItemForm(p => ({ ...p, supplierLeadTime: e.target.value }))} />
+                                </div>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <Label>Min Stock Level</Label>
+                                <Input type="number" step="0.01" value={itemForm.minStockLevel} onChange={e => setItemForm(p => ({ ...p, minStockLevel: e.target.value }))} />
+                            </div>
+                            <div>
+                                <Label>Max Stock Level</Label>
+                                <Input type="number" step="0.01" value={itemForm.maxStockLevel} onChange={e => setItemForm(p => ({ ...p, maxStockLevel: e.target.value }))} />
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-6">
+                            <label className="flex items-center gap-2 text-sm">
+                                <input type="checkbox" checked={itemForm.trackBatch} onChange={e => setItemForm(p => ({ ...p, trackBatch: e.target.checked }))} className="rounded" />
+                                Track Batch #
+                            </label>
+                            <label className="flex items-center gap-2 text-sm">
+                                <input type="checkbox" checked={itemForm.trackExpiry} onChange={e => setItemForm(p => ({ ...p, trackExpiry: e.target.checked }))} className="rounded" />
+                                Track Expiry Date
+                            </label>
+                        </div>
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setShowItemDialog(false)}>Cancel</Button>
@@ -897,6 +1130,71 @@ export default function InventoryManagement() {
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setShowJobDialog(false)}>Cancel</Button>
                         <Button onClick={handleCreateJob}>Create Job</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+            {/* ═══════════════════ PO DIALOG ═══════════════════ */}
+            <Dialog open={showPODialog} onOpenChange={setShowPODialog}>
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader><DialogTitle>New Purchase Order</DialogTitle></DialogHeader>
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <Label>Supplier Name *</Label>
+                                <Input value={poForm.supplierName} onChange={e => setPOForm(p => ({ ...p, supplierName: e.target.value }))} />
+                            </div>
+                            <div>
+                                <Label>Supplier Code</Label>
+                                <Input value={poForm.supplierCode} onChange={e => setPOForm(p => ({ ...p, supplierCode: e.target.value }))} />
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <Label>Deliver To *</Label>
+                                <select className="w-full h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm" value={poForm.deliverTo} onChange={e => setPOForm(p => ({ ...p, deliverTo: e.target.value }))}>
+                                    <option value="">Select location…</option>
+                                    {locations.map(l => <option key={l._id} value={l._id}>{l.name}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <Label>Expected Delivery</Label>
+                                <Input type="date" value={poForm.expectedDeliveryDate} onChange={e => setPOForm(p => ({ ...p, expectedDeliveryDate: e.target.value }))} />
+                            </div>
+                        </div>
+                        <div>
+                            <Label>Notes</Label>
+                            <Textarea value={poForm.notes} onChange={e => setPOForm(p => ({ ...p, notes: e.target.value }))} rows={2} />
+                        </div>
+                        <div>
+                            <div className="flex justify-between items-center mb-2">
+                                <Label className="text-sm font-semibold">Line Items</Label>
+                                <Button size="sm" variant="outline" onClick={() => setPOForm(p => ({ ...p, lines: [...p.lines, { itemId: '', quantity: '', unitCost: '' }] }))}><Plus size={14} className="mr-1" /> Add Line</Button>
+                            </div>
+                            {poForm.lines.map((line: any, idx: number) => (
+                                <div key={idx} className="grid grid-cols-[1fr_80px_100px_32px] gap-2 items-end mb-2">
+                                    <div>
+                                        {idx === 0 && <Label className="text-xs text-slate-500">Item</Label>}
+                                        <select className="w-full h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm" value={line.itemId} onChange={e => { const lines = [...poForm.lines]; lines[idx] = { ...lines[idx], itemId: e.target.value }; setPOForm(p => ({ ...p, lines })); }}>
+                                            <option value="">Select…</option>
+                                            {items.map(it => <option key={it._id} value={it._id}>{it.name} ({it.sku})</option>)}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        {idx === 0 && <Label className="text-xs text-slate-500">Qty</Label>}
+                                        <Input type="number" min="1" value={line.quantity} onChange={e => { const lines = [...poForm.lines]; lines[idx] = { ...lines[idx], quantity: e.target.value }; setPOForm(p => ({ ...p, lines })); }} />
+                                    </div>
+                                    <div>
+                                        {idx === 0 && <Label className="text-xs text-slate-500">Unit Cost</Label>}
+                                        <Input type="number" step="0.01" min="0" value={line.unitCost} onChange={e => { const lines = [...poForm.lines]; lines[idx] = { ...lines[idx], unitCost: e.target.value }; setPOForm(p => ({ ...p, lines })); }} />
+                                    </div>
+                                    <Button size="sm" variant="ghost" className="text-red-500 h-9 w-9 p-0" onClick={() => { if (poForm.lines.length <= 1) return; const lines = poForm.lines.filter((_: any, i: number) => i !== idx); setPOForm(p => ({ ...p, lines })); }}><Trash2 size={14} /></Button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowPODialog(false)}>Cancel</Button>
+                        <Button onClick={handleCreatePO}>Create PO</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

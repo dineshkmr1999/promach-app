@@ -25,7 +25,7 @@ const erpUserSchema = new mongoose.Schema({
     },
     role: {
         type: String,
-        enum: ['Admin', 'Operations_Manager', 'Field_Technician'],
+        enum: ['Admin', 'Operations_Manager', 'Field_Technician', 'User'],
         required: true
     },
     // Link technicians to their assigned van/vehicle
