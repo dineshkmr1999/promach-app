@@ -38,9 +38,14 @@ export default function StaffLogin() {
             localStorage.setItem('erpUser', JSON.stringify(response.user));
             navigate('/staff/dashboard');
         } catch (err: any) {
-            const msg = err.message || 'Invalid email or password';
+            let msg = err.message || 'Something went wrong';
+            if (msg === 'Failed to fetch') {
+                msg = 'Unable to connect to the server. Please check your internet connection and try again.';
+            } else if (msg.includes('locked') || msg.includes('Locked')) {
+                msg = 'Your account has been temporarily locked due to too many failed attempts. Please try again later.';
+            }
             // Show as inline password error for credential failures
-            if (msg.toLowerCase().includes('invalid') || msg.toLowerCase().includes('credentials')) {
+            if (msg.toLowerCase().includes('invalid') || msg.toLowerCase().includes('credentials') || msg.toLowerCase().includes('password')) {
                 setFieldErrors({ password: msg });
             } else {
                 setError(msg);

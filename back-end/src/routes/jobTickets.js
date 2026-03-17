@@ -343,6 +343,11 @@ router.post('/:id/start', async (req, res) => {
             return res.status(403).json({ message: 'You are not assigned to this job' });
         }
 
+        // Require before photos
+        if (!ticket.tracking?.beforeImages || ticket.tracking.beforeImages.length === 0) {
+            return res.status(400).json({ message: 'Please upload at least one before photo before starting the job' });
+        }
+
         ticket.tracking = ticket.tracking || {};
         ticket.tracking.startedAt = new Date();
         ticket.status = 'In_Progress';
@@ -367,6 +372,11 @@ router.post('/:id/complete', async (req, res) => {
         const isAssigned = ticket.assignedTechnicians.some(t => t.toString() === req.erpUser.id);
         if (!isAssigned && req.erpUser.role === 'Field_Technician') {
             return res.status(403).json({ message: 'You are not assigned to this job' });
+        }
+
+        // Require after photos
+        if (!ticket.tracking?.afterImages || ticket.tracking.afterImages.length === 0) {
+            return res.status(400).json({ message: 'Please upload at least one after photo before completing the job' });
         }
 
         ticket.tracking = ticket.tracking || {};

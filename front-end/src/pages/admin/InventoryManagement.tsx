@@ -17,7 +17,8 @@ import {
     Warehouse, Truck, Building2, AlertTriangle, TrendingDown, CheckCircle2, Clock,
     ChevronRight, Send, Download, Eye, Trash2, Edit, Users, ShoppingCart,
     FileText, BarChart3, ClipboardCheck, DollarSign, Loader2, Upload, FileSpreadsheet,
-    X, ChevronDown, ChevronUp, Hash, Calendar, TrendingUp, Activity, BookOpen
+    X, ChevronDown, ChevronUp, Hash, Calendar, TrendingUp, Activity, BookOpen,
+    Camera, Phone, Timer, Star, Navigation, Image, Save
 } from 'lucide-react';
 import { itemsAPI, locationsAPI, inventoryAPI, jobTicketsAPI, assetsAPI, erpAuthAPI, purchaseOrdersAPI } from '@/services/erpApi';
 import { useToast } from '@/hooks/use-toast';
@@ -58,12 +59,18 @@ interface StockTransfer {
 }
 interface JobTicket {
     _id: string; ticketNumber: string; jobType: string; status: string; priority: string;
-    customer: { name: string; phone?: string; email?: string };
-    siteAddress?: { street?: string; postalCode?: string; unit?: string };
-    scheduledDate: string; quotedPrice: number; totalMaterialCost: number; grossProfit: number;
-    assignedTechnicians?: { _id: string; name: string; phone?: string }[];
+    customer: { name: string; phone?: string; email?: string; company?: string };
+    siteAddress?: { street?: string; postalCode?: string; unit?: string; building?: string };
+    scheduledDate: string; scheduledTimeSlot?: string; quotedPrice: number; totalMaterialCost: number; grossProfit: number;
+    assignedTechnicians?: { _id: string; name: string; phone?: string; email?: string }[];
     createdBy?: { _id: string; name: string };
-    costLines?: any[];
+    costLines?: any[]; internalNotes?: string; customerRemarks?: string; completedAt?: string;
+    tracking?: {
+        checkedInAt?: string; checkedInLocation?: { lat: number; lng: number };
+        startedAt?: string; finishedAt?: string; durationMinutes?: number;
+        beforeImages?: string[]; afterImages?: string[];
+        technicianNotes?: string; customerRating?: number; customerFeedback?: string;
+    };
 }
 interface AssetItem extends MasterItem {}
 interface LowStockItem {
@@ -142,6 +149,12 @@ export default function InventoryManagement() {
     const [jobStatusFilter, setJobStatusFilter] = useState('');
     const [showJobDialog, setShowJobDialog] = useState(false);
     const [jobForm, setJobForm] = useState({ jobType: 'Aircon_Service', customerName: '', customerPhone: '', customerEmail: '', street: '', postalCode: '', unit: '', scheduledDate: '', scheduledTimeSlot: '', quotedPrice: '0', priority: 'Normal', internalNotes: '' });
+    const [selectedJob, setSelectedJob] = useState<JobTicket | null>(null);
+    const [editingJob, setEditingJob] = useState(false);
+    const [editJobForm, setEditJobForm] = useState({ jobType: '', customerName: '', customerPhone: '', customerEmail: '', street: '', postalCode: '', unit: '', scheduledDate: '', scheduledTimeSlot: '', quotedPrice: '', priority: '', status: '', internalNotes: '' });
+    const [savingJob, setSavingJob] = useState(false);
+    const [erpUsers, setErpUsers] = useState<{ _id: string; name: string; role: string }[]>([]);
+    const [assignedTechIds, setAssignedTechIds] = useState<string[]>([]);
 
     // ── Assets state ──
     const [assets, setAssets] = useState<AssetItem[]>([]);
@@ -311,6 +324,66 @@ export default function InventoryManagement() {
             toast({ title: 'Transfer created' }); setShowTransferDialog(false); loadTransfers();
         } catch (err: any) { toast({ title: 'Error', description: err.message, variant: 'destructive' }); }
     };
+
+    // ── Job detail + edit handlers ──
+    const openJobDetail = async (job: JobTicket) => {
+        setSelectedJob(job);
+        setEditingJob(false);
+        try {
+            const full = await jobTicketsAPI.get(job._id);
+            setSelectedJob(full);
+        } catch { /* keep partial data */ }
+    };
+
+    const startEditJob = async () => {
+        if (!selectedJob) return;
+        setEditJobForm({
+            jobType: selectedJob.jobType,
+            customerName: selectedJob.customer.name,
+            customerPhone: selectedJob.customer.phone || '',
+            customerEmail: selectedJob.customer.email || '',
+            street: selectedJob.siteAddress?.street || '',
+            postalCode: selectedJob.siteAddress?.postalCode || '',
+            unit: selectedJob.siteAddress?.unit || '',
+            scheduledDate: selectedJob.scheduledDate ? new Date(selectedJob.scheduledDate).toISOString().split('T')[0] : '',
+            scheduledTimeSlot: selectedJob.scheduledTimeSlot || '',
+            quotedPrice: String(selectedJob.quotedPrice || 0),
+            priority: selectedJob.priority,
+            status: selectedJob.status,
+            internalNotes: selectedJob.internalNotes || '',
+        });
+        setAssignedTechIds((selectedJob.assignedTechnicians || []).map(t => t._id));
+        // Load users for technician assignment
+        try { const users = await erpAuthAPI.listUsers(); setErpUsers(users); } catch { /* ignore */ }
+        setEditingJob(true);
+    };
+
+    const handleSaveJob = async () => {
+        if (!selectedJob) return;
+        setSavingJob(true);
+        try {
+            const payload: any = {
+                jobType: editJobForm.jobType,
+                customer: { name: editJobForm.customerName, phone: editJobForm.customerPhone, email: editJobForm.customerEmail },
+                siteAddress: { street: editJobForm.street, postalCode: editJobForm.postalCode, unit: editJobForm.unit },
+                scheduledDate: editJobForm.scheduledDate,
+                scheduledTimeSlot: editJobForm.scheduledTimeSlot,
+                quotedPrice: parseFloat(editJobForm.quotedPrice) || 0,
+                priority: editJobForm.priority,
+                status: editJobForm.status,
+                internalNotes: editJobForm.internalNotes,
+                assignedTechnicians: assignedTechIds,
+            };
+            const updated = await jobTicketsAPI.update(selectedJob._id, payload);
+            setSelectedJob(updated);
+            setEditingJob(false);
+            toast({ title: 'Job updated' });
+            loadJobs();
+        } catch (err: any) {
+            toast({ title: 'Error', description: err.message, variant: 'destructive' });
+        } finally { setSavingJob(false); }
+    };
+
     const handleDispatch = async (id: string) => {
         try { await inventoryAPI.dispatchTransfer(id); toast({ title: 'Transfer dispatched' }); loadTransfers(); }
         catch (err: any) { toast({ title: 'Error', description: err.message, variant: 'destructive' }); }
@@ -737,7 +810,7 @@ export default function InventoryManagement() {
                                     {jobs.length === 0 ? (
                                         <TableRow><TableCell colSpan={9} className="text-center text-slate-400 py-10">No job tickets</TableCell></TableRow>
                                     ) : jobs.map(job => (
-                                        <TableRow key={job._id} className="hover:bg-slate-50">
+                                        <TableRow key={job._id} className="hover:bg-slate-50 cursor-pointer" onClick={() => openJobDetail(job)}>
                                             <TableCell className="font-mono text-sm font-medium">{job.ticketNumber}</TableCell>
                                             <TableCell>
                                                 <p className="font-medium text-sm">{job.customer.name}</p>
@@ -1301,6 +1374,295 @@ export default function InventoryManagement() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* ═══════════════════ JOB DETAIL / EDIT DIALOG ═══════════════════ */}
+            <Dialog open={!!selectedJob} onOpenChange={() => { setSelectedJob(null); setEditingJob(false); }}>
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                    {selectedJob && !editingJob && (
+                        <>
+                            <DialogHeader>
+                                <DialogTitle className="flex items-center gap-3">
+                                    <span className="font-mono">{selectedJob.ticketNumber}</span>
+                                    {statusBadge(selectedJob.status)}
+                                </DialogTitle>
+                            </DialogHeader>
+                            <div className="space-y-4">
+                                {/* Customer & Site */}
+                                <div className="grid grid-cols-2 gap-4">
+                                    <Card className="border shadow-none">
+                                        <CardContent className="p-3 space-y-1">
+                                            <p className="text-xs font-semibold text-slate-500 uppercase">Customer</p>
+                                            <p className="font-medium">{selectedJob.customer.name}</p>
+                                            {selectedJob.customer.phone && <p className="text-sm text-slate-600 flex items-center gap-1"><Phone size={12} /> {selectedJob.customer.phone}</p>}
+                                            {selectedJob.customer.email && <p className="text-sm text-slate-500">{selectedJob.customer.email}</p>}
+                                        </CardContent>
+                                    </Card>
+                                    <Card className="border shadow-none">
+                                        <CardContent className="p-3 space-y-1">
+                                            <p className="text-xs font-semibold text-slate-500 uppercase">Site Address</p>
+                                            {selectedJob.siteAddress?.street && <p className="text-sm">{selectedJob.siteAddress.unit ? `${selectedJob.siteAddress.unit}, ` : ''}{selectedJob.siteAddress.street}</p>}
+                                            {selectedJob.siteAddress?.postalCode && <p className="text-sm text-slate-500">Singapore {selectedJob.siteAddress.postalCode}</p>}
+                                        </CardContent>
+                                    </Card>
+                                </div>
+
+                                {/* Schedule & Assignment */}
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="flex items-center gap-2 text-sm">
+                                        <Calendar size={14} className="text-slate-400" />
+                                        <span>{new Date(selectedJob.scheduledDate).toLocaleDateString('en-SG', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                                        {selectedJob.scheduledTimeSlot && <Badge variant="outline" className="text-xs">{selectedJob.scheduledTimeSlot}</Badge>}
+                                    </div>
+                                    <div className="flex items-center gap-2 text-sm">
+                                        <Briefcase size={14} className="text-slate-400" />
+                                        <span>{selectedJob.jobType.replace(/_/g, ' ')}</span>
+                                        <Badge className={`text-xs border-0 ${selectedJob.priority === 'Urgent' ? 'bg-red-100 text-red-700' : selectedJob.priority === 'High' ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-600'}`}>{selectedJob.priority}</Badge>
+                                    </div>
+                                </div>
+
+                                {/* Assigned Technicians */}
+                                {selectedJob.assignedTechnicians && selectedJob.assignedTechnicians.length > 0 && (
+                                    <div>
+                                        <p className="text-xs font-semibold text-slate-500 uppercase mb-1">Assigned Technicians</p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {selectedJob.assignedTechnicians.map(t => (
+                                                <Badge key={t._id} variant="outline" className="gap-1"><Users size={12} /> {t.name}{t.phone && ` • ${t.phone}`}</Badge>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Financials */}
+                                <div className="bg-slate-50 rounded-xl p-3 grid grid-cols-3 gap-3 text-center">
+                                    <div><p className="text-[10px] text-slate-500 uppercase">Quoted</p><p className="font-bold text-lg">${selectedJob.quotedPrice?.toFixed(2)}</p></div>
+                                    <div><p className="text-[10px] text-slate-500 uppercase">Material Cost</p><p className="font-bold text-lg">${selectedJob.totalMaterialCost?.toFixed(2)}</p></div>
+                                    <div><p className="text-[10px] text-slate-500 uppercase">Profit</p><p className={`font-bold text-lg ${(selectedJob.grossProfit || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>${selectedJob.grossProfit?.toFixed(2)}</p></div>
+                                </div>
+
+                                {/* Tracking Timeline */}
+                                {selectedJob.tracking && (selectedJob.tracking.checkedInAt || selectedJob.tracking.startedAt || selectedJob.tracking.finishedAt) && (
+                                    <div>
+                                        <p className="text-xs font-semibold text-slate-500 uppercase mb-2">Job Timeline</p>
+                                        <div className="space-y-2">
+                                            {selectedJob.tracking.checkedInAt && (
+                                                <div className="flex items-center gap-3 text-sm"><CheckCircle2 size={16} className="text-green-500 shrink-0" /><span>Checked in: {new Date(selectedJob.tracking.checkedInAt).toLocaleString('en-SG')}</span></div>
+                                            )}
+                                            {selectedJob.tracking.startedAt && (
+                                                <div className="flex items-center gap-3 text-sm"><Play size={16} className="text-blue-500 shrink-0" /><span>Started: {new Date(selectedJob.tracking.startedAt).toLocaleString('en-SG')}</span></div>
+                                            )}
+                                            {selectedJob.tracking.finishedAt && (
+                                                <div className="flex items-center gap-3 text-sm"><CheckCircle2 size={16} className="text-green-500 shrink-0" /><span>Finished: {new Date(selectedJob.tracking.finishedAt).toLocaleString('en-SG')}</span></div>
+                                            )}
+                                            {selectedJob.tracking.durationMinutes != null && (
+                                                <div className="flex items-center gap-3 text-sm"><Timer size={16} className="text-amber-500 shrink-0" /><span>Duration: {selectedJob.tracking.durationMinutes < 60 ? `${selectedJob.tracking.durationMinutes} min` : `${Math.floor(selectedJob.tracking.durationMinutes / 60)}h ${selectedJob.tracking.durationMinutes % 60}m`}</span></div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Before & After Photos */}
+                                {selectedJob.tracking?.beforeImages && selectedJob.tracking.beforeImages.length > 0 && (
+                                    <div>
+                                        <p className="text-xs font-semibold text-slate-500 uppercase mb-2">Before Photos</p>
+                                        <div className="flex gap-2 flex-wrap">
+                                            {selectedJob.tracking.beforeImages.map((img, i) => (
+                                                <a key={i} href={img} target="_blank" rel="noopener noreferrer" className="w-24 h-24 rounded-lg bg-slate-100 overflow-hidden block hover:ring-2 ring-primary transition-all">
+                                                    <img src={img} alt={`Before ${i + 1}`} className="w-full h-full object-cover" />
+                                                </a>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                                {selectedJob.tracking?.afterImages && selectedJob.tracking.afterImages.length > 0 && (
+                                    <div>
+                                        <p className="text-xs font-semibold text-slate-500 uppercase mb-2">After Photos</p>
+                                        <div className="flex gap-2 flex-wrap">
+                                            {selectedJob.tracking.afterImages.map((img, i) => (
+                                                <a key={i} href={img} target="_blank" rel="noopener noreferrer" className="w-24 h-24 rounded-lg bg-slate-100 overflow-hidden block hover:ring-2 ring-primary transition-all">
+                                                    <img src={img} alt={`After ${i + 1}`} className="w-full h-full object-cover" />
+                                                </a>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Customer Rating */}
+                                {selectedJob.tracking?.customerRating && (
+                                    <div className="flex items-center gap-2">
+                                        <p className="text-xs font-semibold text-slate-500 uppercase">Customer Rating</p>
+                                        <div className="flex gap-0.5">{[1, 2, 3, 4, 5].map(s => <Star key={s} size={16} className={s <= selectedJob.tracking!.customerRating! ? 'text-amber-400 fill-amber-400' : 'text-slate-200'} />)}</div>
+                                        {selectedJob.tracking.customerFeedback && <span className="text-sm text-slate-600 ml-2">"{selectedJob.tracking.customerFeedback}"</span>}
+                                    </div>
+                                )}
+
+                                {/* Technician Notes */}
+                                {selectedJob.tracking?.technicianNotes && (
+                                    <div className="bg-blue-50 rounded-xl p-3">
+                                        <p className="text-xs font-semibold text-blue-700 mb-1">Technician Notes</p>
+                                        <p className="text-sm text-blue-900 whitespace-pre-line">{selectedJob.tracking.technicianNotes}</p>
+                                    </div>
+                                )}
+
+                                {/* Cost Lines */}
+                                {selectedJob.costLines && selectedJob.costLines.length > 0 && (
+                                    <div>
+                                        <p className="text-xs font-semibold text-slate-500 uppercase mb-2">Material Cost Lines</p>
+                                        <Table>
+                                            <TableHeader>
+                                                <TableRow className="bg-slate-50 text-xs">
+                                                    <TableHead>Item</TableHead>
+                                                    <TableHead className="text-right">Qty</TableHead>
+                                                    <TableHead className="text-right">Unit Cost</TableHead>
+                                                    <TableHead className="text-right">Total</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {selectedJob.costLines.map((cl: any, i: number) => (
+                                                    <TableRow key={cl._id || i} className="text-sm">
+                                                        <TableCell>{cl.item?.name || cl.description || '—'}</TableCell>
+                                                        <TableCell className="text-right">{typeof cl.quantity === 'number' ? cl.quantity : parseFloat(cl.quantity?.$numberDecimal || cl.quantity || '0')}</TableCell>
+                                                        <TableCell className="text-right">${typeof cl.unitCost === 'number' ? cl.unitCost.toFixed(2) : parseFloat(cl.unitCost?.$numberDecimal || cl.unitCost || '0').toFixed(2)}</TableCell>
+                                                        <TableCell className="text-right font-medium">${typeof cl.totalCost === 'number' ? cl.totalCost.toFixed(2) : parseFloat(cl.totalCost?.$numberDecimal || cl.totalCost || '0').toFixed(2)}</TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </div>
+                                )}
+
+                                {/* Internal Notes */}
+                                {selectedJob.internalNotes && (
+                                    <div className="bg-amber-50 rounded-xl p-3">
+                                        <p className="text-xs font-semibold text-amber-700 mb-1">Internal Notes</p>
+                                        <p className="text-sm text-amber-900 whitespace-pre-line">{selectedJob.internalNotes}</p>
+                                    </div>
+                                )}
+
+                                {/* Created By */}
+                                {selectedJob.createdBy?.name && (
+                                    <p className="text-xs text-slate-400">Created by {selectedJob.createdBy.name}</p>
+                                )}
+                            </div>
+                            <DialogFooter>
+                                <Button variant="outline" onClick={() => startEditJob()} className="gap-1"><Edit size={14} /> Edit</Button>
+                                <Button variant="outline" onClick={() => { setSelectedJob(null); setEditingJob(false); }}>Close</Button>
+                            </DialogFooter>
+                        </>
+                    )}
+
+                    {/* ── EDIT MODE ── */}
+                    {selectedJob && editingJob && (
+                        <>
+                            <DialogHeader>
+                                <DialogTitle>Edit {selectedJob.ticketNumber}</DialogTitle>
+                            </DialogHeader>
+                            <div className="grid gap-4 py-2">
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <Label>Job Type</Label>
+                                        <Select value={editJobForm.jobType} onValueChange={v => setEditJobForm(p => ({ ...p, jobType: v }))}>
+                                            <SelectTrigger><SelectValue /></SelectTrigger>
+                                            <SelectContent>
+                                                {['Aircon_Service', 'Aircon_Install', 'Aircon_Repair', 'Renovation', 'Maintenance_Contract', 'Other'].map(t => (
+                                                    <SelectItem key={t} value={t}>{t.replace(/_/g, ' ')}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div>
+                                        <Label>Status</Label>
+                                        <Select value={editJobForm.status} onValueChange={v => setEditJobForm(p => ({ ...p, status: v }))}>
+                                            <SelectTrigger><SelectValue /></SelectTrigger>
+                                            <SelectContent>
+                                                {['Draft', 'Scheduled', 'In_Progress', 'On_Hold', 'Completed', 'Invoiced', 'Cancelled'].map(s => (
+                                                    <SelectItem key={s} value={s}>{s.replace(/_/g, ' ')}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <Label>Priority</Label>
+                                        <Select value={editJobForm.priority} onValueChange={v => setEditJobForm(p => ({ ...p, priority: v }))}>
+                                            <SelectTrigger><SelectValue /></SelectTrigger>
+                                            <SelectContent>
+                                                {['Low', 'Normal', 'High', 'Urgent'].map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div>
+                                        <Label>Quoted Price (SGD)</Label>
+                                        <Input type="number" step="0.01" value={editJobForm.quotedPrice} onChange={e => setEditJobForm(p => ({ ...p, quotedPrice: e.target.value }))} />
+                                    </div>
+                                </div>
+                                <div>
+                                    <Label>Customer Name</Label>
+                                    <Input value={editJobForm.customerName} onChange={e => setEditJobForm(p => ({ ...p, customerName: e.target.value }))} />
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <Label>Phone</Label>
+                                        <Input value={editJobForm.customerPhone} onChange={e => setEditJobForm(p => ({ ...p, customerPhone: e.target.value }))} />
+                                    </div>
+                                    <div>
+                                        <Label>Email</Label>
+                                        <Input type="email" value={editJobForm.customerEmail} onChange={e => setEditJobForm(p => ({ ...p, customerEmail: e.target.value }))} />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-3 gap-3">
+                                    <div>
+                                        <Label>Street</Label>
+                                        <Input value={editJobForm.street} onChange={e => setEditJobForm(p => ({ ...p, street: e.target.value }))} />
+                                    </div>
+                                    <div>
+                                        <Label>Unit</Label>
+                                        <Input value={editJobForm.unit} onChange={e => setEditJobForm(p => ({ ...p, unit: e.target.value }))} placeholder="#01-01" />
+                                    </div>
+                                    <div>
+                                        <Label>Postal Code</Label>
+                                        <Input value={editJobForm.postalCode} onChange={e => setEditJobForm(p => ({ ...p, postalCode: e.target.value }))} />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <Label>Scheduled Date</Label>
+                                        <Input type="date" value={editJobForm.scheduledDate} onChange={e => setEditJobForm(p => ({ ...p, scheduledDate: e.target.value }))} />
+                                    </div>
+                                    <div>
+                                        <Label>Time Slot</Label>
+                                        <Input value={editJobForm.scheduledTimeSlot} onChange={e => setEditJobForm(p => ({ ...p, scheduledTimeSlot: e.target.value }))} placeholder="09:00-12:00" />
+                                    </div>
+                                </div>
+                                <div>
+                                    <Label>Assign Technicians</Label>
+                                    <div className="flex flex-wrap gap-2 mt-1">
+                                        {erpUsers.filter(u => ['Field_Technician', 'Operations_Manager'].includes(u.role)).map(u => (
+                                            <label key={u._id} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm cursor-pointer transition-colors ${assignedTechIds.includes(u._id) ? 'bg-primary/10 border-primary text-primary' : 'border-slate-200 hover:bg-slate-50'}`}>
+                                                <input type="checkbox" className="sr-only" checked={assignedTechIds.includes(u._id)}
+                                                    onChange={() => setAssignedTechIds(prev => prev.includes(u._id) ? prev.filter(id => id !== u._id) : [...prev, u._id])} />
+                                                {u.name}
+                                            </label>
+                                        ))}
+                                        {erpUsers.filter(u => ['Field_Technician', 'Operations_Manager'].includes(u.role)).length === 0 && <p className="text-xs text-slate-400">No technicians found</p>}
+                                    </div>
+                                </div>
+                                <div>
+                                    <Label>Internal Notes</Label>
+                                    <Textarea value={editJobForm.internalNotes} onChange={e => setEditJobForm(p => ({ ...p, internalNotes: e.target.value }))} rows={2} />
+                                </div>
+                            </div>
+                            <DialogFooter>
+                                <Button variant="outline" onClick={() => setEditingJob(false)}>Cancel</Button>
+                                <Button onClick={handleSaveJob} disabled={savingJob} className="gap-1.5">
+                                    {savingJob ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save Changes
+                                </Button>
+                            </DialogFooter>
+                        </>
+                    )}
+                </DialogContent>
+            </Dialog>
+
             {/* ═══════════════════ PO DIALOG ═══════════════════ */}
             <Dialog open={showPODialog} onOpenChange={setShowPODialog}>
                 <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">

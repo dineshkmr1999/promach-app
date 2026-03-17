@@ -235,7 +235,9 @@ export default function StaffDashboard() {
       loadJobs();
     } catch (err: any) {
       let msg = err.message || 'Location access failed';
-      if (err instanceof GeolocationPositionError) {
+      if (msg === 'Failed to fetch') {
+        msg = 'Network error — check your connection and try again';
+      } else if (err instanceof GeolocationPositionError) {
         if (err.code === 1) msg = 'Location permission denied. Please allow location access in your browser settings and try again.';
         else if (err.code === 2) msg = 'Could not determine your location. Please check your GPS/network and try again.';
         else if (err.code === 3) msg = 'Location request timed out. Please move to an area with better signal.';
@@ -249,6 +251,10 @@ export default function StaffDashboard() {
 
   const handleStartJob = async () => {
     if (!selectedJob) return;
+    if (!selectedJob.tracking?.beforeImages || selectedJob.tracking.beforeImages.length === 0) {
+      toast({ title: 'Before photos required', description: 'Please upload at least one before photo before starting the job', variant: 'destructive' });
+      return;
+    }
     setTrackingAction('start');
     try {
       await jobTicketsAPI.start(selectedJob._id);
@@ -257,12 +263,17 @@ export default function StaffDashboard() {
       setSelectedJob(updated);
       loadJobs();
     } catch (err: any) {
-      toast({ title: 'Failed to start', description: err.message, variant: 'destructive' });
+      const msg = err.message === 'Failed to fetch' ? 'Network error — check your connection and try again' : err.message;
+      toast({ title: 'Failed to start', description: msg, variant: 'destructive' });
     } finally { setTrackingAction(null); }
   };
 
   const handleCompleteJob = async () => {
     if (!selectedJob) return;
+    if (!selectedJob.tracking?.afterImages || selectedJob.tracking.afterImages.length === 0) {
+      toast({ title: 'After photos required', description: 'Please upload at least one after photo before completing the job', variant: 'destructive' });
+      return;
+    }
     setTrackingAction('complete');
     try {
       await jobTicketsAPI.complete(selectedJob._id, { technicianNotes: techNotes || undefined });
@@ -273,7 +284,8 @@ export default function StaffDashboard() {
       setTechNotes('');
       loadJobs();
     } catch (err: any) {
-      toast({ title: 'Failed to complete', description: err.message, variant: 'destructive' });
+      const msg = err.message === 'Failed to fetch' ? 'Network error — check your connection and try again' : err.message;
+      toast({ title: 'Failed to complete', description: msg, variant: 'destructive' });
     } finally { setTrackingAction(null); }
   };
 
@@ -287,7 +299,8 @@ export default function StaffDashboard() {
       setSelectedJob(updated);
       loadJobs();
     } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      const msg = err.message === 'Failed to fetch' ? 'Network error — check your connection' : err.message;
+      toast({ title: 'Error', description: msg, variant: 'destructive' });
     } finally { setTrackingAction(null); }
   };
 
@@ -301,7 +314,8 @@ export default function StaffDashboard() {
       setSelectedJob(updated);
       loadJobs();
     } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      const msg = err.message === 'Failed to fetch' ? 'Network error — check your connection' : err.message;
+      toast({ title: 'Error', description: msg, variant: 'destructive' });
     } finally { setTrackingAction(null); }
   };
 
@@ -314,7 +328,8 @@ export default function StaffDashboard() {
       const updated = await jobTicketsAPI.get(selectedJob._id);
       setSelectedJob(updated);
     } catch (err: any) {
-      toast({ title: 'Upload failed', description: err.message, variant: 'destructive' });
+      const msg = err.message === 'Failed to fetch' ? 'Network error — check your connection and try again' : err.message;
+      toast({ title: 'Upload failed', description: msg, variant: 'destructive' });
     } finally { setUploading(false); }
   };
 
@@ -967,7 +982,7 @@ export default function StaffDashboard() {
         {showJobDetail && selectedJob && (
           <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowJobDetail(false)} />
-            <div className="relative bg-white w-full max-w-md max-h-[90vh] overflow-y-auto rounded-t-3xl sm:rounded-2xl animate-in slide-in-from-bottom duration-300">
+            <div className="relative bg-white w-full max-w-md max-h-[90vh] overflow-y-auto rounded-t-3xl sm:rounded-2xl animate-in slide-in-from-bottom duration-300" style={{ WebkitOverflowScrolling: 'touch' }}>
               {/* Close button */}
               <button onClick={() => setShowJobDetail(false)}
                 className="absolute top-4 right-4 z-10 w-8 h-8 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-white/30 transition-all duration-200 shadow-sm">
@@ -1010,7 +1025,7 @@ export default function StaffDashboard() {
                 )}
               </div>
 
-              <div className="p-5 space-y-4">
+              <div className="p-5 space-y-4 pb-20">
                 {selectedJob.customer.phone && (
                   <a href={`tel:${selectedJob.customer.phone}`}
                     className="flex items-center gap-3 bg-green-50 text-green-700 p-3 rounded-xl text-sm font-medium active:bg-green-100 transition-colors">
@@ -1067,7 +1082,7 @@ export default function StaffDashboard() {
                     {selectedJob.tracking?.checkedInAt && !selectedJob.tracking?.startedAt && (
                       <div className="space-y-2">
                         <div className="bg-slate-50 rounded-xl p-3">
-                          <p className="text-xs font-medium text-slate-600 mb-2">Before Photos (optional)</p>
+                          <p className="text-xs font-medium text-slate-600 mb-2">📸 Before Photos <span className="text-red-500">(required)</span></p>
                           <div className="flex gap-2 flex-wrap">
                             {(selectedJob.tracking?.beforeImages || []).map((img, i) => (
                               <div key={i} className="w-16 h-16 rounded-lg bg-slate-200 overflow-hidden"><img src={img} alt="" className="w-full h-full object-cover" /></div>
@@ -1089,7 +1104,7 @@ export default function StaffDashboard() {
                     {selectedJob.status === 'In_Progress' && (
                       <div className="space-y-3">
                         <div className="bg-slate-50 rounded-xl p-3">
-                          <p className="text-xs font-medium text-slate-600 mb-2">Job Photos</p>
+                          <p className="text-xs font-medium text-slate-600 mb-2">📸 After Photos <span className="text-red-500">(required before completing)</span></p>
                           <div className="flex gap-2 flex-wrap">
                             {(selectedJob.tracking?.afterImages || []).map((img, i) => (
                               <div key={i} className="w-16 h-16 rounded-lg bg-slate-200 overflow-hidden"><img src={img} alt="" className="w-full h-full object-cover" /></div>
