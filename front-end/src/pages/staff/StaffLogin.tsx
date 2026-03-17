@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { erpAuthAPI } from '@/services/erpApi';
 import { HardHat, ArrowLeft, Eye, EyeOff, Mail, Lock, Loader2, AlertCircle } from 'lucide-react';
+import logo from '@/assets/LOGO.png';
 
 export default function StaffLogin() {
     const [email, setEmail] = useState('');
@@ -64,11 +65,12 @@ export default function StaffLogin() {
                 <div className="p-8">
                     {/* Header */}
                     <div className="text-center mb-8">
-                        <div className="w-16 h-16 mx-auto bg-gradient-to-br from-primary/15 to-primary/5 rounded-2xl flex items-center justify-center mb-4 shadow-sm">
-                            <HardHat className="w-8 h-8 text-primary" />
+                        <div className="relative mx-auto mb-5 w-fit">
+                            <div className="absolute inset-0 bg-primary/15 rounded-full blur-2xl scale-150" />
+                            <img src={logo} alt="Promach" className="relative h-14 sm:h-16 w-auto object-contain drop-shadow-md" />
                         </div>
-                        <h1 className="text-2xl font-bold text-slate-900 mb-1">Staff Portal</h1>
-                        <p className="text-sm text-slate-500">Sign in to access Inventory &amp; Field Operations</p>
+                        <h1 className="text-xl sm:text-2xl font-bold text-slate-900 mb-1">Staff Portal</h1>
+                        <p className="text-xs sm:text-sm text-slate-500">Sign in to access Inventory &amp; Field Operations</p>
                     </div>
 
                     {/* Form */}

@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { AlertCircle, Eye, EyeOff, User, ArrowLeft } from 'lucide-react';
+import logo from '@/assets/LOGO.png';
 
 export default function CustomerLogin() {
     const navigate = useNavigate();
@@ -51,13 +52,14 @@ export default function CustomerLogin() {
         <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center p-4">
             <Card className="w-full max-w-md p-8 shadow-xl border-0">
                 <div className="text-center mb-6">
-                    <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                        <User size={32} className="text-white" />
+                    <div className="relative mx-auto mb-5 w-fit">
+                        <div className="absolute inset-0 bg-blue-400/15 rounded-full blur-2xl scale-150" />
+                        <img src={logo} alt="Promach" className="relative h-14 sm:h-16 w-auto object-contain drop-shadow-md" />
                     </div>
-                    <h1 className="text-2xl font-bold text-slate-900">
+                    <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
                         {mode === 'login' ? 'Customer Login' : 'Create Account'}
                     </h1>
-                    <p className="text-sm text-slate-500 mt-1">Book and track your services with Promach</p>
+                    <p className="text-xs sm:text-sm text-slate-500 mt-1">Book and track your services with Promach</p>
                 </div>
 
                 {error && (
