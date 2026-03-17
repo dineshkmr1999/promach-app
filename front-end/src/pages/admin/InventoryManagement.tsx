@@ -18,7 +18,7 @@ import {
     ChevronRight, Send, Download, Eye, Trash2, Edit, Users, ShoppingCart,
     FileText, BarChart3, ClipboardCheck, DollarSign, Loader2, Upload, FileSpreadsheet,
     X, ChevronDown, ChevronUp, Hash, Calendar, TrendingUp, Activity, BookOpen,
-    Camera, Phone, Timer, Star, Navigation, Image, Save
+    Camera, Phone, Timer, Star, Navigation, Image, Save, Play
 } from 'lucide-react';
 import { itemsAPI, locationsAPI, inventoryAPI, jobTicketsAPI, assetsAPI, erpAuthAPI, purchaseOrdersAPI } from '@/services/erpApi';
 import { useToast } from '@/hooks/use-toast';
