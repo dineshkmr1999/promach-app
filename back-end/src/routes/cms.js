@@ -11,8 +11,9 @@ const { verifyToken } = require('./auth');
 const uploadDir = path.join(__dirname, '../../uploads');
 const certificatesDir = path.join(uploadDir, 'certificates');
 const brandsDir = path.join(uploadDir, 'brands');
+const sustainabilityDir = path.join(uploadDir, 'sustainability');
 
-[uploadDir, certificatesDir, brandsDir].forEach(dir => {
+[uploadDir, certificatesDir, brandsDir, sustainabilityDir].forEach(dir => {
     if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
     }
@@ -98,7 +99,8 @@ router.patch('/:section', verifyToken, async (req, res) => {
         const allowedSections = [
             'pricingTables', 'additionalServices', 'brands', 'brandsWithLogos',
             'certificates', 'seo', 'companyInfo', 'socialMedia',
-            'aboutPage', 'contactPage', 'bcaRegistrations', 'croSettings'
+            'aboutPage', 'contactPage', 'bcaRegistrations', 'croSettings',
+            'sustainabilityPage'
         ];
 
         if (!allowedSections.includes(section)) {
@@ -966,6 +968,342 @@ router.delete('/cro-settings/testimonials/:id', verifyToken, async (req, res) =>
         res.json({ message: 'Testimonial deleted successfully' });
     } catch (error) {
         res.status(500).json({ message: 'Error deleting testimonial' });
+    }
+});
+
+// =============================
+// SUSTAINABILITY PAGE ROUTES
+// =============================
+
+// Default sustainability content (used when the section is empty)
+const DEFAULT_SUSTAINABILITY = {
+    hero: {
+        title: 'Sustainability Policy & Commitment',
+        subtitle: 'Promach Pte. Ltd. is committed to delivering engineering and building services solutions in a responsible and sustainable manner \u2014 integrating energy efficiency, environmental compliance, and resource optimization into every project.',
+        badge: 'ISO 14001 Certified'
+    },
+    commitment: {
+        title: 'Our Commitment',
+        paragraphs: [
+            'Promach Pte. Ltd. is committed to delivering engineering and building services solutions in a responsible and sustainable manner. We support our clients\u2019 sustainability objectives by integrating energy efficiency, environmental compliance, and resource optimization into our operations and project execution.',
+            'Our approach is aligned with applicable Singapore regulations, industry best practices, and continuous improvement principles, while ensuring that sustainability measures remain practical, safe, and technically suitable for each project.'
+        ]
+    },
+    framework: {
+        title: 'Sustainability Framework',
+        intro: 'Our sustainability practices are guided by structured management systems and operational controls that support consistent environmental performance. Promach operates under the following certified frameworks:',
+        outro: 'These frameworks support our commitment towards compliance, waste reduction, efficient resource usage, and continual improvement.',
+        standards: [
+            { code: 'ISO 14001', name: 'Environmental Management System', description: 'Structured controls for environmental performance and compliance, ensuring continual improvement in our environmental impact across all projects.', isActive: true, order: 0 },
+            { code: 'ISO 9001', name: 'Quality Management System', description: 'Consistent quality across every project we deliver, with systematic processes that ensure reliability and client satisfaction.', isActive: true, order: 1 },
+            { code: 'ISO 45001', name: 'Occupational Health & Safety Management System', description: 'Safe operations that protect our workforce and partners, with proactive risk management and continuous safety improvement.', isActive: true, order: 2 },
+            { code: 'ISO 37001', name: 'Anti-Bribery Management System', description: 'Certified anti-bribery management system ensuring ethical business practices and transparency in all operations.', isActive: true, order: 3 },
+            { code: 'BizSAFE STAR', name: 'Workplace Safety & Health Council Recognition', description: 'Highest tier of BizSAFE recognition in Singapore, demonstrating our commitment to workplace safety and health excellence.', isActive: true, order: 4 }
+        ]
+    },
+    focusAreas: {
+        title: 'Key Focus Areas',
+        subtitle: 'Six pillars that guide how we plan, execute, and improve every project \u2014 ensuring environmental responsibility at every stage.',
+        items: [
+            { title: 'Energy Efficiency', description: 'Promach promotes the use of energy-efficient ACMV and mechanical systems where applicable. Proper installation, testing, commissioning, and maintenance practices are implemented to improve system performance and reduce unnecessary energy consumption.', icon: 'Zap', isActive: true, order: 0 },
+            { title: 'Environmental Protection', description: 'We support environmentally responsible solutions, including the use of compliant refrigerants with lower Global Warming Potential (GWP), where technically feasible and aligned with project requirements.', icon: 'Globe', isActive: true, order: 1 },
+            { title: 'Waste Management & Recycling', description: 'Promach adopts proper segregation, recycling, and disposal practices for replaced or removed materials through licensed waste contractors, in accordance with regulatory requirements.', icon: 'Recycle', isActive: true, order: 2 },
+            { title: 'Resource Optimization', description: 'We reduce material wastage through careful planning, proper quantity control, and reuse of existing serviceable materials where safe and feasible.', icon: 'Package', isActive: true, order: 3 },
+            { title: 'Lifecycle & Durability', description: 'Promach emphasizes the selection of durable and corrosion-resistant materials to extend equipment lifespan, reduce replacement frequency, and lower long-term environmental impact.', icon: 'Shield', isActive: true, order: 4 },
+            { title: 'Digitalization', description: 'Promach adopts digital documentation and electronic submission systems to enhance operational efficiency and reduce paper consumption. Through the use of digital platforms, system monitoring dashboards, and data-driven reporting tools, we improve workflow transparency, streamline communication, and support more efficient project management and maintenance operations. Digitalization also enables better tracking of system performance, timely reporting, and improved decision-making, contributing to overall efficiency and sustainability in project execution.', icon: 'Monitor', isActive: true, order: 5 }
+        ]
+    },
+    targets: {
+        title: 'Our Sustainability Targets',
+        subtitle: 'We are committed to driving responsible practices that create long-term value for our projects, people, and the environment.',
+        items: [
+            { title: 'Waste Reduction', description: 'Reduce material wastage through improved planning and reuse practices.', icon: 'Recycle', isActive: true, order: 0 },
+            { title: 'Energy Efficiency', description: 'Promote energy-efficient systems where technically feasible.', icon: 'Zap', isActive: true, order: 1 },
+            { title: 'Recycling', description: 'Ensure proper disposal of waste materials through licensed contractors.', icon: 'Trash2', isActive: true, order: 2 },
+            { title: 'Compliance', description: 'Maintain full compliance with environmental regulations and industry standards.', icon: 'ShieldCheck', isActive: true, order: 3 },
+            { title: 'Continuous Improvement', description: 'Continuously improve environmental performance under our ISO 14001 framework.', icon: 'TrendingUp', isActive: true, order: 4 },
+            { title: 'Preventive Maintenance', description: 'Enhance preventive maintenance practices to improve system efficiency and lifespan.', icon: 'Wrench', isActive: true, order: 5 }
+        ]
+    },
+    implementation: {
+        title: 'Our Project Implementation Approach',
+        subtitle: 'Sustainability is incorporated into our project lifecycle through every key stage \u2014 ensuring responsible, efficient, and high-quality outcomes.',
+        steps: [
+            { title: 'Planning', description: 'Efficient planning and coordination to reduce abortive works and improve resource utilization.', icon: 'ClipboardList', isActive: true, order: 0 },
+            { title: 'Procurement', description: 'Responsible sourcing and optimized logistics to minimize unnecessary transport movements.', icon: 'ShoppingCart', isActive: true, order: 1 },
+            { title: 'Installation', description: 'Proper installation and commissioning practices to ensure system efficiency and reliability.', icon: 'HardHat', isActive: true, order: 2 },
+            { title: 'Waste Handling', description: 'Responsible handling, segregation, and disposal of removed and replaced materials through licensed contractors.', icon: 'Recycle', isActive: true, order: 3 },
+            { title: 'Testing & Commissioning', description: 'Rigorous testing and commissioning to verify system performance and ensure compliance.', icon: 'CheckCircle', isActive: true, order: 4 },
+            { title: 'Maintenance', description: 'Preventive maintenance to improve performance, extend service life, and reduce long-term environmental impact.', icon: 'Wrench', isActive: true, order: 5 }
+        ]
+    },
+    alternatives: {
+        title: 'Sustainable Alternatives We Offer',
+        subtitle: 'Promach Pte. Ltd. supports Singtel\u2019s sustainability objectives by adopting practical, efficient, and environmentally responsible approaches in our project execution. The following sustainable alternatives can be considered, subject to Client approval, site conditions, and technical suitability:',
+        items: [
+            { title: 'Energy Efficiency Enhancement', description: 'Adoption of energy-efficient equipment and systems where applicable, with optimization of installation and commissioning practices to ensure efficient operation, reduced energy consumption, and improved system performance.', icon: 'Zap', isActive: true, order: 0 },
+            { title: 'Environmentally Responsible Refrigerants', description: 'Preference for systems utilizing low Global Warming Potential (GWP) refrigerants, where compliant with NEA regulations and aligned with project specifications.', icon: 'Snowflake', isActive: true, order: 1 },
+            { title: 'Material Optimization and Reuse', description: 'Reuse of existing serviceable materials such as supports, containment, and piping routes where feasible, to minimize material wastage and reduce environmental impact.', icon: 'Layers', isActive: true, order: 2 },
+            { title: 'Waste Management and Recycling', description: 'Proper segregation, recycling, and disposal of replaced materials through licensed waste contractors, in accordance with environmental regulations and best practices.', icon: 'Recycle', isActive: true, order: 3 },
+            { title: 'Durable Material Selection', description: 'Use of corrosion-resistant and durable materials to extend equipment lifespan, thereby reducing replacement frequency and long-term environmental impact.', icon: 'Shield', isActive: true, order: 4 },
+            { title: 'Resource and Logistics Efficiency', description: 'Careful planning of materials and work sequences to minimize over-ordering, abortive works, and unnecessary transportation, contributing to reduced carbon footprint.', icon: 'Truck', isActive: true, order: 5 },
+            { title: 'Digital Documentation', description: 'Adoption of digital submissions, reports, and documentation where possible to reduce paper consumption and improve efficiency.', icon: 'Monitor', isActive: true, order: 6 },
+            { title: 'Preventive Maintenance Approach', description: 'Implementation of effective maintenance strategies to enhance system efficiency, reduce operational losses, and prolong asset life.', icon: 'Wrench', isActive: true, order: 7 }
+        ]
+    },
+    continuousImprovement: {
+        title: 'Continuous Improvement',
+        paragraphs: [
+            'Promach remains committed to continuously improving our sustainability practices in line with evolving regulatory requirements, industry standards, and client expectations.',
+            'We will continue to strengthen our processes, awareness, and implementation practices to support responsible and sustainable project delivery.'
+        ]
+    },
+    disclaimer: 'All sustainability initiatives described herein are implemented on a best-effort basis and are subject to project specifications, site conditions, technical feasibility, applicable approvals, and Client requirements. Promach Pte. Ltd. shall not be held liable for any design changes, performance variations, or cost implications arising from the adoption of sustainability alternatives beyond the agreed contractual scope. All proposed alternatives are indicative and shall be subject to Client approval, consultant requirements, and project specifications.',
+    documents: []
+};
+
+function hasSustainabilityContent(cms) {
+    const s = cms?.sustainabilityPage;
+    if (!s) return false;
+    return !!(
+        s.focusAreas?.items?.length ||
+        s.targets?.items?.length ||
+        s.implementation?.steps?.length ||
+        s.alternatives?.items?.length ||
+        s.framework?.standards?.length
+    );
+}
+
+// GET - Get sustainability content (seeds defaults if empty)
+router.get('/sustainability', async (req, res) => {
+    try {
+        let cms = await CMSData.findOne();
+        if (!cms) {
+            cms = new CMSData();
+        }
+        if (!hasSustainabilityContent(cms)) {
+            cms.sustainabilityPage = DEFAULT_SUSTAINABILITY;
+            await cms.save();
+        }
+        res.json(cms.sustainabilityPage);
+    } catch (error) {
+        console.error('Error fetching sustainability:', error);
+        res.status(500).json({ message: 'Error fetching sustainability content' });
+    }
+});
+
+// PUT - Update sustainability page (partial merge per top-level key)
+router.put('/sustainability', verifyToken, async (req, res) => {
+    try {
+        const updates = req.body || {};
+        let cms = await CMSData.findOne();
+        if (!cms) cms = new CMSData();
+
+        if (!cms.sustainabilityPage) cms.sustainabilityPage = {};
+
+        // Merge each provided top-level section
+        Object.keys(updates).forEach(key => {
+            cms.sustainabilityPage[key] = updates[key];
+        });
+
+        await cms.save();
+        res.json(cms.sustainabilityPage);
+    } catch (error) {
+        console.error('Error updating sustainability:', error);
+        res.status(500).json({ message: 'Error updating sustainability content' });
+    }
+});
+
+// Generic helper for subdocument list endpoints
+// listKey examples: 'focusAreas.items', 'targets.items', 'implementation.steps',
+// 'alternatives.items', 'framework.standards'
+function buildSubRoutes(routeName, listPath) {
+    // POST add
+    router.post(`/sustainability/${routeName}`, verifyToken, async (req, res) => {
+        try {
+            const newItem = {
+                _id: new mongoose.Types.ObjectId(),
+                ...req.body,
+                isActive: req.body.isActive !== undefined ? req.body.isActive : true,
+                order: req.body.order !== undefined ? req.body.order : 0
+            };
+            await CMSData.updateOne(
+                {},
+                { $push: { [`sustainabilityPage.${listPath}`]: newItem } },
+                { upsert: true, runValidators: false }
+            );
+            res.status(201).json(newItem);
+        } catch (error) {
+            console.error(`Error adding ${routeName}:`, error);
+            res.status(500).json({ message: `Error adding ${routeName}` });
+        }
+    });
+
+    // PUT update
+    router.put(`/sustainability/${routeName}/:id`, verifyToken, async (req, res) => {
+        try {
+            const { id } = req.params;
+            const cms = await CMSData.findOne();
+            if (!cms) return res.status(404).json({ message: 'CMS not found' });
+
+            const segments = listPath.split('.');
+            const list = segments.reduce((obj, key) => obj?.[key], cms.sustainabilityPage);
+            if (!Array.isArray(list)) return res.status(404).json({ message: 'List not found' });
+
+            const index = list.findIndex(i => i._id?.toString() === id);
+            if (index === -1) return res.status(404).json({ message: 'Item not found' });
+
+            list[index] = { ...list[index].toObject?.() || list[index], ...req.body, _id: list[index]._id };
+            await CMSData.updateOne(
+                { _id: cms._id },
+                { $set: { [`sustainabilityPage.${listPath}.${index}`]: list[index] } },
+                { runValidators: false }
+            );
+            res.json(list[index]);
+        } catch (error) {
+            console.error(`Error updating ${routeName}:`, error);
+            res.status(500).json({ message: `Error updating ${routeName}` });
+        }
+    });
+
+    // DELETE
+    router.delete(`/sustainability/${routeName}/:id`, verifyToken, async (req, res) => {
+        try {
+            const { id } = req.params;
+            const objectId = new mongoose.Types.ObjectId(id);
+            await CMSData.updateOne(
+                {},
+                { $pull: { [`sustainabilityPage.${listPath}`]: { _id: objectId } } },
+                { runValidators: false }
+            );
+            res.json({ message: 'Deleted successfully' });
+        } catch (error) {
+            console.error(`Error deleting ${routeName}:`, error);
+            res.status(500).json({ message: `Error deleting ${routeName}` });
+        }
+    });
+}
+
+buildSubRoutes('standards', 'framework.standards');
+buildSubRoutes('focus-areas', 'focusAreas.items');
+buildSubRoutes('targets', 'targets.items');
+buildSubRoutes('implementation-steps', 'implementation.steps');
+buildSubRoutes('alternatives', 'alternatives.items');
+
+// ===============
+// DOCUMENT UPLOAD
+// ===============
+const sustainabilityStorage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, sustainabilityDir),
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, uniqueSuffix + path.extname(file.originalname));
+    }
+});
+
+const sustainabilityUpload = multer({
+    storage: sustainabilityStorage,
+    limits: { fileSize: 20 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+        const ext = path.extname(file.originalname).toLowerCase();
+        cb(null, ext === '.pdf');
+    }
+});
+
+router.post('/sustainability/documents', verifyToken, sustainabilityUpload.single('file'), async (req, res) => {
+    try {
+        const { name, description } = req.body;
+        if (!req.file) return res.status(400).json({ message: 'PDF file is required' });
+
+        const newDoc = {
+            _id: new mongoose.Types.ObjectId(),
+            name: name || req.file.originalname,
+            description: description || '',
+            file: `/uploads/sustainability/${req.file.filename}`,
+            isActive: true,
+            order: 0
+        };
+
+        await CMSData.updateOne(
+            {},
+            { $push: { 'sustainabilityPage.documents': newDoc } },
+            { upsert: true, runValidators: false }
+        );
+
+        res.status(201).json(newDoc);
+    } catch (error) {
+        console.error('Error uploading document:', error);
+        res.status(500).json({ message: 'Error uploading document' });
+    }
+});
+
+router.put('/sustainability/documents/:id', verifyToken, sustainabilityUpload.single('file'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const cms = await CMSData.findOne();
+        if (!cms) return res.status(404).json({ message: 'CMS not found' });
+
+        const docs = cms.sustainabilityPage?.documents || [];
+        const index = docs.findIndex(d => d._id?.toString() === id);
+        if (index === -1) return res.status(404).json({ message: 'Document not found' });
+
+        const current = docs[index].toObject ? docs[index].toObject() : docs[index];
+        const updated = {
+            ...current,
+            name: req.body.name ?? current.name,
+            description: req.body.description ?? current.description,
+            isActive: req.body.isActive !== undefined ? req.body.isActive : current.isActive
+        };
+
+        if (req.file) {
+            // Remove old file if it exists
+            if (current.file) {
+                const oldPath = path.join(__dirname, '../..', current.file);
+                if (fs.existsSync(oldPath)) {
+                    try { fs.unlinkSync(oldPath); } catch (e) { /* ignore */ }
+                }
+            }
+            updated.file = `/uploads/sustainability/${req.file.filename}`;
+        }
+
+        await CMSData.updateOne(
+            { _id: cms._id },
+            { $set: { [`sustainabilityPage.documents.${index}`]: updated } },
+            { runValidators: false }
+        );
+
+        res.json(updated);
+    } catch (error) {
+        console.error('Error updating document:', error);
+        res.status(500).json({ message: 'Error updating document' });
+    }
+});
+
+router.delete('/sustainability/documents/:id', verifyToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const cms = await CMSData.findOne();
+        if (!cms) return res.status(404).json({ message: 'CMS not found' });
+
+        const doc = cms.sustainabilityPage?.documents?.find(d => d._id?.toString() === id);
+        if (doc?.file) {
+            const filePath = path.join(__dirname, '../..', doc.file);
+            if (fs.existsSync(filePath)) {
+                try { fs.unlinkSync(filePath); } catch (e) { /* ignore */ }
+            }
+        }
+
+        const objectId = new mongoose.Types.ObjectId(id);
+        await CMSData.updateOne(
+            {},
+            { $pull: { 'sustainabilityPage.documents': { _id: objectId } } },
+            { runValidators: false }
+        );
+
+        res.json({ message: 'Document deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting document:', error);
+        res.status(500).json({ message: 'Error deleting document' });
     }
 });
 

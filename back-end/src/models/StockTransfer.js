@@ -56,7 +56,6 @@ const stockTransferSchema = new mongoose.Schema({
 
 stockTransferSchema.index({ status: 1 });
 stockTransferSchema.index({ fromLocation: 1, toLocation: 1 });
-stockTransferSchema.index({ transferNumber: 1 });
 
 stockTransferSchema.set('toJSON', {
     transform: function (doc, ret) {

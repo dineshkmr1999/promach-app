@@ -20,7 +20,8 @@ import {
     Palette,
     TrendingUp,
     Package,
-    Users
+    Users,
+    Leaf
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -41,6 +42,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         { path: '/admin/company-info', icon: Building2, label: 'Company Info' },
         { path: '/admin/about-us', icon: FileText, label: 'About Us' },
         { path: '/admin/contact-us', icon: Phone, label: 'Contact Us' },
+        { path: '/admin/sustainability', icon: Leaf, label: 'Sustainability' },
         { path: '/admin/seo', icon: Search, label: 'SEO Settings' },
         { path: '/admin/cro-settings', icon: TrendingUp, label: 'CRO Settings' },
     ];

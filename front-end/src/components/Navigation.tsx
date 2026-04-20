@@ -185,6 +185,14 @@ const Navigation = () => {
                   </NavigationMenuItem>
 
                   <NavigationMenuItem>
+                    <Link to="/sustainability">
+                      <NavigationMenuLink className="group inline-flex h-10 w-max items-center justify-center rounded-md bg-transparent px-4 py-2 text-sm font-medium transition-colors hover:bg-primary/10 hover:text-primary focus:bg-primary/10 focus:text-primary focus:outline-none disabled:pointer-events-none disabled:opacity-50 data-[active]:bg-primary/10 data-[state=open]:bg-primary/10">
+                        Sustainability
+                      </NavigationMenuLink>
+                    </Link>
+                  </NavigationMenuItem>
+
+                  <NavigationMenuItem>
                     <Link to="/contact">
                       <NavigationMenuLink className="group inline-flex h-10 w-max items-center justify-center rounded-md bg-transparent px-4 py-2 text-sm font-medium transition-colors hover:bg-primary/10 hover:text-primary focus:bg-primary/10 focus:text-primary focus:outline-none disabled:pointer-events-none disabled:opacity-50 data-[active]:bg-primary/10 data-[state=open]:bg-primary/10">
                         Contact
@@ -236,6 +244,7 @@ const Navigation = () => {
               <Link to="/renovation" className="block px-4 py-3 text-sm font-medium hover:bg-accent rounded-md transition-colors" onClick={() => setMobileMenuOpen(false)}>Renovation</Link>
               <Link to="/portfolio" className="block px-4 py-3 text-sm font-medium hover:bg-accent rounded-md transition-colors" onClick={() => setMobileMenuOpen(false)}>Portfolio</Link>
               <Link to="/about" className="block px-4 py-3 text-sm font-medium hover:bg-accent rounded-md transition-colors" onClick={() => setMobileMenuOpen(false)}>About Us</Link>
+              <Link to="/sustainability" className="block px-4 py-3 text-sm font-medium hover:bg-accent rounded-md transition-colors" onClick={() => setMobileMenuOpen(false)}>Sustainability</Link>
               <Link to="/contact" className="block px-4 py-3 text-sm font-medium hover:bg-accent rounded-md transition-colors" onClick={() => setMobileMenuOpen(false)}>Contact</Link>
               <Link to="/staff/login" className="flex items-center gap-2 px-4 py-3 text-sm font-medium hover:bg-accent rounded-md transition-colors text-primary" onClick={() => setMobileMenuOpen(false)}><HardHat size={16} /> Staff Login</Link>
               <div className="px-4 pt-2">

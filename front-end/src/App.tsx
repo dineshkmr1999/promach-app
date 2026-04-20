@@ -13,6 +13,7 @@ import Renovation from "./pages/Renovation";
 import Booking from "./pages/Booking";
 import About from "./pages/About";
 import Contact from "./pages/Contact";
+import Sustainability from "./pages/Sustainability";
 import NotFound from "./pages/NotFound";
 
 // Lazy load pages that may not exist yet
@@ -31,6 +32,7 @@ const BrandsManagement = lazy(() => import("./pages/admin/BrandsManagement"));
 const CompanyInfoManagement = lazy(() => import("./pages/admin/CompanyInfoManagement"));
 const AboutUsManagement = lazy(() => import("./pages/admin/AboutUsManagement"));
 const ContactUsManagement = lazy(() => import("./pages/admin/ContactUsManagement"));
+const SustainabilityManagement = lazy(() => import("./pages/admin/SustainabilityManagement"));
 const SEOManagement = lazy(() => import("./pages/admin/SEOManagement"));
 const BCARegistrationsManagement = lazy(() => import("./pages/admin/BCARegistrationsManagement"));
 const CROSettingsManagement = lazy(() => import("./pages/admin/CROSettingsManagement"));
@@ -59,6 +61,7 @@ const App = () => (
                 <Route path="/portfolio" element={<Portfolio />} />
                 <Route path="/booking" element={<Booking />} />
                 <Route path="/about" element={<About />} />
+                <Route path="/sustainability" element={<Sustainability />} />
                 <Route path="/contact" element={<Contact />} />
 
                 {/* Staff Portal */}
@@ -82,6 +85,7 @@ const App = () => (
                 <Route path="/admin/company-info" element={<CompanyInfoManagement />} />
                 <Route path="/admin/about-us" element={<AboutUsManagement />} />
                 <Route path="/admin/contact-us" element={<ContactUsManagement />} />
+                <Route path="/admin/sustainability" element={<SustainabilityManagement />} />
                 <Route path="/admin/seo" element={<SEOManagement />} />
                 <Route path="/admin/cro-settings" element={<CROSettingsManagement />} />
                 <Route path="/admin/inventory" element={<InventoryManagement />} />

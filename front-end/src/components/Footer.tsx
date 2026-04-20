@@ -102,6 +102,7 @@ const Footer = () => {
                 { to: "/portfolio", label: "Our Portfolio" },
                 { to: "/booking", label: "Book Appointment" },
                 { to: "/about", label: "About Us" },
+                { to: "/sustainability", label: "Sustainability" },
                 { to: "/contact", label: "Contact" },
               ].map((link) => (
                 <li key={link.to}>

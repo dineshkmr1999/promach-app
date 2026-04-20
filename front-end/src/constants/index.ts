@@ -140,6 +140,11 @@ export const PAGE_SEO = {
     description: "Contact Promach for aircon servicing and renovation inquiries. Located at Suntec Tower Three, Singapore. Call (65) 6829 2136 or email us.",
     keywords: ["contact promach", "aircon service quote", "renovation quote singapore"],
   },
+  sustainability: {
+    title: "Sustainability Policy & Commitment | Promach Pte Ltd",
+    description: "Promach's Sustainability Policy: ISO 14001 certified environmental management, energy efficiency, responsible waste management, and continuous improvement across every ACMV and renovation project.",
+    keywords: ["sustainability policy singapore", "ISO 14001 contractor", "green ACMV", "sustainable renovation", "low GWP refrigerants", "BizSAFE STAR"],
+  },
 } as const;
 
 // ============================================

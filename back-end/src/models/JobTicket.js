@@ -181,7 +181,6 @@ jobTicketSchema.methods.recalcCosts = function () {
     this.grossProfit = mongoose.Types.Decimal128.fromString((quoted - total).toFixed(2));
 };
 
-jobTicketSchema.index({ ticketNumber: 1 });
 jobTicketSchema.index({ status: 1, scheduledDate: 1 });
 jobTicketSchema.index({ assignedTechnicians: 1 });
 jobTicketSchema.index({ 'customer.name': 'text', ticketNumber: 'text' });

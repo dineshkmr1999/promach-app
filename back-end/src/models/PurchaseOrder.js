@@ -79,7 +79,6 @@ const purchaseOrderSchema = new mongoose.Schema({
     timestamps: true
 });
 
-purchaseOrderSchema.index({ poNumber: 1 });
 purchaseOrderSchema.index({ status: 1, createdAt: -1 });
 purchaseOrderSchema.index({ createdBy: 1 });
 purchaseOrderSchema.index({ 'supplier.name': 1 });

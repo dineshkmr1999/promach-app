@@ -484,3 +484,98 @@ export const croSettingsAPI = {
   }
 };
 
+// ============================
+// SUSTAINABILITY API
+// ============================
+const authHeaders = () => {
+  const token = localStorage.getItem('adminToken');
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`,
+  };
+};
+
+const authHeadersNoContent = () => {
+  const token = localStorage.getItem('adminToken');
+  return { 'Authorization': `Bearer ${token}` };
+};
+
+export const sustainabilityAPI = {
+  get: async () => {
+    const response = await fetch(`${API_URL}/cms/sustainability`);
+    if (!response.ok) throw new Error('Failed to fetch sustainability content');
+    return response.json();
+  },
+
+  update: async (data: any) => {
+    const response = await fetch(`${API_URL}/cms/sustainability`, {
+      method: 'PUT',
+      headers: authHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) throw new Error('Failed to update sustainability content');
+    return response.json();
+  },
+
+  // Generic list item helpers.
+  // listName must be one of: 'standards' | 'focus-areas' | 'targets' |
+  // 'implementation-steps' | 'alternatives'
+  addItem: async (listName: string, item: any) => {
+    const response = await fetch(`${API_URL}/cms/sustainability/${listName}`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(item),
+    });
+    if (!response.ok) throw new Error('Failed to add item');
+    return response.json();
+  },
+
+  updateItem: async (listName: string, id: string, item: any) => {
+    const response = await fetch(`${API_URL}/cms/sustainability/${listName}/${id}`, {
+      method: 'PUT',
+      headers: authHeaders(),
+      body: JSON.stringify(item),
+    });
+    if (!response.ok) throw new Error('Failed to update item');
+    return response.json();
+  },
+
+  deleteItem: async (listName: string, id: string) => {
+    const response = await fetch(`${API_URL}/cms/sustainability/${listName}/${id}`, {
+      method: 'DELETE',
+      headers: authHeadersNoContent(),
+    });
+    if (!response.ok) throw new Error('Failed to delete item');
+    return response.json();
+  },
+
+  uploadDocument: async (formData: FormData) => {
+    const response = await fetch(`${API_URL}/cms/sustainability/documents`, {
+      method: 'POST',
+      headers: authHeadersNoContent(),
+      body: formData,
+    });
+    if (!response.ok) throw new Error('Failed to upload document');
+    return response.json();
+  },
+
+  updateDocument: async (id: string, formData: FormData) => {
+    const response = await fetch(`${API_URL}/cms/sustainability/documents/${id}`, {
+      method: 'PUT',
+      headers: authHeadersNoContent(),
+      body: formData,
+    });
+    if (!response.ok) throw new Error('Failed to update document');
+    return response.json();
+  },
+
+  deleteDocument: async (id: string) => {
+    const response = await fetch(`${API_URL}/cms/sustainability/documents/${id}`, {
+      method: 'DELETE',
+      headers: authHeadersNoContent(),
+    });
+    if (!response.ok) throw new Error('Failed to delete document');
+    return response.json();
+  },
+};
+

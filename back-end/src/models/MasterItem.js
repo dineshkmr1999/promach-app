@@ -81,8 +81,7 @@ const masterItemSchema = new mongoose.Schema({
     },
     barcode: {
         type: String,
-        trim: true,
-        sparse: true
+        trim: true
     },
 
     // ── Batch / Expiry Tracking ──
@@ -98,8 +97,7 @@ const masterItemSchema = new mongoose.Schema({
     // ── Asset/Tool-specific ──
     assetTag: {
         type: String,
-        trim: true,
-        sparse: true
+        trim: true
     },
     assetStatus: {
         type: String,
@@ -155,10 +153,7 @@ masterItemSchema.set('toJSON', {
     }
 });
 
-masterItemSchema.index({ sku: 1 });
 masterItemSchema.index({ itemType: 1, isActive: 1 });
 masterItemSchema.index({ name: 'text', sku: 'text' });
-masterItemSchema.index({ assetTag: 1 }, { sparse: true });
-masterItemSchema.index({ barcode: 1 }, { sparse: true });
 
 module.exports = mongoose.model('MasterItem', masterItemSchema);

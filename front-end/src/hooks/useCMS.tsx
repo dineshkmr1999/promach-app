@@ -58,6 +58,7 @@ interface CMSData {
         additionalInfo?: string;
     };
     aboutPage?: any;
+    sustainabilityPage?: any;
     bcaRegistrations?: {
         sectionTitle?: string;
         companyName?: string;

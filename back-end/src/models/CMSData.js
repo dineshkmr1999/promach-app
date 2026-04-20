@@ -189,6 +189,103 @@ const cmsSchema = new mongoose.Schema({
             showWhatsAppButton: { type: Boolean, default: true },
             showQuoteButton: { type: Boolean, default: true }
         }
+    },
+    // Sustainability Page Content (maps to both the
+    // "Sustainability Policy & Commitment" and "Sustainability Alternative
+    // Proposal" documents)
+    sustainabilityPage: {
+        hero: {
+            title: { type: String, default: 'Sustainability Policy & Commitment' },
+            subtitle: { type: String, default: 'Delivering engineering and building services in a responsible, compliant, and sustainable manner.' },
+            badge: { type: String, default: 'ISO 14001 Certified' }
+        },
+        commitment: {
+            title: { type: String, default: 'Our Commitment' },
+            paragraphs: {
+                type: [String],
+                default: [
+                    'Promach Pte. Ltd. is committed to delivering engineering and building services solutions in a responsible and sustainable manner. We support our clients\u2019 sustainability objectives by integrating energy efficiency, environmental compliance, and resource optimization into our operations and project execution.',
+                    'Our approach is aligned with applicable Singapore regulations, industry best practices, and continuous improvement principles, while ensuring that sustainability measures remain practical, safe, and technically suitable for each project.'
+                ]
+            }
+        },
+        framework: {
+            title: { type: String, default: 'Sustainability Framework' },
+            intro: { type: String, default: 'Our sustainability practices are guided by structured management systems and operational controls that support consistent environmental performance.' },
+            outro: { type: String, default: 'These frameworks support our commitment towards compliance, waste reduction, efficient resource usage, and continual improvement.' },
+            standards: [{
+                code: String,
+                name: String,
+                description: String,
+                isActive: { type: Boolean, default: true },
+                order: { type: Number, default: 0 }
+            }]
+        },
+        focusAreas: {
+            title: { type: String, default: 'Key Focus Areas' },
+            subtitle: { type: String, default: 'Six pillars that guide how we plan, execute, and improve every project.' },
+            items: [{
+                title: String,
+                description: String,
+                icon: String,
+                isActive: { type: Boolean, default: true },
+                order: { type: Number, default: 0 }
+            }]
+        },
+        targets: {
+            title: { type: String, default: 'Our Sustainability Targets' },
+            subtitle: { type: String, default: 'We are committed to driving responsible practices that create long-term value for our projects, people, and the environment.' },
+            items: [{
+                title: String,
+                description: String,
+                icon: String,
+                isActive: { type: Boolean, default: true },
+                order: { type: Number, default: 0 }
+            }]
+        },
+        implementation: {
+            title: { type: String, default: 'Our Project Implementation Approach' },
+            subtitle: { type: String, default: 'Sustainability is incorporated into our project lifecycle through every key stage \u2014 ensuring responsible, efficient, and high-quality outcomes.' },
+            steps: [{
+                title: String,
+                description: String,
+                icon: String,
+                isActive: { type: Boolean, default: true },
+                order: { type: Number, default: 0 }
+            }]
+        },
+        alternatives: {
+            title: { type: String, default: 'Sustainable Alternatives We Offer' },
+            subtitle: { type: String, default: 'Subject to Client approval, site conditions, and technical suitability, Promach can adopt the following sustainability alternatives.' },
+            items: [{
+                title: String,
+                description: String,
+                icon: String,
+                isActive: { type: Boolean, default: true },
+                order: { type: Number, default: 0 }
+            }]
+        },
+        continuousImprovement: {
+            title: { type: String, default: 'Continuous Improvement' },
+            paragraphs: {
+                type: [String],
+                default: [
+                    'Promach remains committed to continuously improving our sustainability practices in line with evolving regulatory requirements, industry standards, and client expectations.',
+                    'We will continue to strengthen our processes, awareness, and implementation practices to support responsible and sustainable project delivery.'
+                ]
+            }
+        },
+        disclaimer: {
+            type: String,
+            default: 'All sustainability initiatives described herein are implemented on a best-effort basis and are subject to project specifications, site conditions, technical feasibility, applicable approvals, and Client requirements. Promach Pte. Ltd. shall not be held liable for any design changes, performance variations, or cost implications arising from the adoption of sustainability alternatives beyond the agreed contractual scope.'
+        },
+        documents: [{
+            name: String,
+            description: String,
+            file: String,
+            isActive: { type: Boolean, default: true },
+            order: { type: Number, default: 0 }
+        }]
     }
 }, { timestamps: true });
 

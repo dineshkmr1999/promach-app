@@ -19,19 +19,25 @@ export function useInView({
   rootMargin = '0px 0px -60px 0px',
   triggerOnce = true,
 }: UseInViewOptions = {}) {
-  const ref = useRef<HTMLDivElement>(null);
+  const [node, setNode] = useState<HTMLDivElement | null>(null);
   const [isInView, setIsInView] = useState(false);
 
+  // Callback ref so the observer is (re-)created whenever the DOM node mounts
+  const ref = useRef<HTMLDivElement | null>(null);
+  const callbackRef = (el: HTMLDivElement | null) => {
+    ref.current = el;
+    setNode(el);
+  };
+
   useEffect(() => {
-    const element = ref.current;
-    if (!element) return;
+    if (!node) return;
 
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
           setIsInView(true);
           if (triggerOnce) {
-            observer.unobserve(element);
+            observer.unobserve(node);
           }
         } else if (!triggerOnce) {
           setIsInView(false);
@@ -40,11 +46,11 @@ export function useInView({
       { threshold, rootMargin }
     );
 
-    observer.observe(element);
+    observer.observe(node);
     return () => observer.disconnect();
-  }, [threshold, rootMargin, triggerOnce]);
+  }, [node, threshold, rootMargin, triggerOnce]);
 
-  return { ref, isInView };
+  return { ref: callbackRef, isInView };
 }
 
 export default useInView;
